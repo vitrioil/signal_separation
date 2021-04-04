@@ -1,0 +1,14 @@
+.ipynb_checkpoints/
+__pycache__
+*mp3
+.cache/
+pretrained_models/
+flask_session/
+data/
+*pkl
+*swp
+*db
+env/
+static/*mp3
+.idea/
+.vscode/
