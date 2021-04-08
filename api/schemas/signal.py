@@ -1,6 +1,6 @@
 from typing import List
 from enum import Enum
-from pydantic import BaseModel, Field, BaseConfig
+from pydantic import BaseModel, Field
 
 from api.schemas import DBModelMixin
 
@@ -20,10 +20,15 @@ class SignalMetadata(BaseModel):
     )
 
 
-class Signal(BaseModel):
+class SignalBase(BaseModel):
     signal_metadata: SignalMetadata = Field(..., description="Signal Metadata")
     signal_id: str = Field(..., description="Signal ID")
     separated_stem_id: List[str] = Field([], description="Signal ID of separated stems")
+
+
+class Signal(SignalBase):
+    pass
+    # binary file here
 
 
 class SignalInResponse(BaseModel):

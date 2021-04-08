@@ -3,39 +3,47 @@ from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from api.schemas import Signal, SignalType, SignalMetadata, SignalInResponse, SignalInCreate
-from api.services import create_signal
+from api.schemas import (
+    Signal,
+    SignalType,
+    SignalMetadata,
+    SignalInResponse,
+    SignalInCreate,
+)
+from api.services import create_signal, read_signal, remove_signal
 from api.db import get_database
 
 router = APIRouter(
     prefix="/signal", tags=["signal"], responses={404: {"description": "Not found"}}
 )
 
-signal_db: List = [
-    {
-        "signal_metadata": {
-            "extension": "mp3",
-            "sample_rate": 42000,
-            "length": 60,
-            "channels": 2,
-            "signal_type": SignalType.Music,
-        }
-    }
-]
-
 
 @router.get("/", response_model=List[Signal])
-async def read_signal_names():
-    return signal_db
+async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
+    signals = await read_signal(db)
+    return signals
 
 
-@router.post("/", response_model=SignalInResponse)
-async def post_signal(signal_type: SignalType, db: AsyncIOMotorClient = Depends(get_database)):
-    signal_metadata = SignalMetadata(extension="mp3", sample_rate=42_000,
-                                     length=60, channels=2, signal_type=signal_type)
+@router.post("/{signal_type}", response_model=SignalInResponse)
+async def post_signal(
+    signal_type: SignalType, db: AsyncIOMotorClient = Depends(get_database)
+):
+    signal_metadata = SignalMetadata(
+        extension="mp3",
+        sample_rate=42_000,
+        length=60,
+        channels=2,
+        signal_type=signal_type,
+    )
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id="TEST")
     signal_in_response = await create_signal(db, signal)
     return SignalInResponse(signal=signal_in_response)
+
+
+@router.delete("/{signal_id}")
+async def delete_signal(signal_id: str, db: AsyncIOMotorClient = Depends(get_database)):
+    deleted = await remove_signal(db, signal_id)
+    return {"signal_id": signal_id, "deleted": deleted}
 
 
 # @router.get("/{signal_type}", response_model=Signal)

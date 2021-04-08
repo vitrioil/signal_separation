@@ -26,6 +26,11 @@ if not MONGODB_URL:
     MONGODB_URL = (
         f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}"
     )
+
+    MONGO_USER_TEST = os.getenv("MONGO_USER", "signal_sep_test")
+    MONGO_PASS_TEST = os.getenv("MONGO_PASSWORD", "signal_sep_test")
+    MONGO_DB_TEST = os.getenv("MONGO_DB", "signal_sep_test")
+    MONGODB_TEST_URL = f"mongodb://{MONGO_USER_TEST}:{MONGO_PASS_TEST}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB_TEST}"
 else:
     MONGODB_URL = MONGODB_URL
 
