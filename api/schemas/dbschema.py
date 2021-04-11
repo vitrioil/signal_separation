@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from bson.objectid import ObjectId
 
 
 class DateTimeModelMixin(BaseModel):
@@ -10,4 +11,4 @@ class DateTimeModelMixin(BaseModel):
 
 
 class DBModelMixin(DateTimeModelMixin):
-    id: Optional[int] = None
+    id: Optional[str] = None

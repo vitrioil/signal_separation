@@ -18,6 +18,7 @@ class SignalMetadata(BaseModel):
     signal_type: SignalType = Field(
         ..., example=SignalType.Music, description="Type of Signal"
     )
+    filename: str = Field(..., example="Song", description="Name of file")
 
 
 class SignalBase(BaseModel):
@@ -28,11 +29,6 @@ class SignalBase(BaseModel):
 
 class Signal(SignalBase):
     pass
-    # binary file here
-
-
-class SignalInResponse(BaseModel):
-    signal: Signal
 
 
 class SignalInCreate(Signal):
@@ -41,6 +37,10 @@ class SignalInCreate(Signal):
 
 class SignalInDB(DBModelMixin, Signal):
     pass
+
+
+class SignalInResponse(BaseModel):
+    signal: SignalInDB
 
 
 class SeparatedSignal(Signal):

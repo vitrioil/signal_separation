@@ -1,5 +1,6 @@
 from typing import List
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -10,7 +11,7 @@ from api.schemas import (
     SignalInResponse,
     SignalInCreate,
 )
-from api.services import create_signal, read_signal, remove_signal
+from api.services import create_signal, read_signal, remove_signal, save_signal_file, read_signal_file
 from api.db import get_database
 
 router = APIRouter(
@@ -24,20 +25,33 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     return signals
 
 
+@router.get("/test_binary/{filename}")
+async def get_signal_file(filename: str, db: AsyncIOMotorClient = Depends(get_database)):
+    stream = await read_signal_file(db, filename)
+    if not stream:
+        return HTTPException(status_code=404, detail="File not found") 
+    return StreamingResponse(stream)
+
+
 @router.post("/{signal_type}", response_model=SignalInResponse)
 async def post_signal(
-    signal_type: SignalType, db: AsyncIOMotorClient = Depends(get_database)
+    signal_type: SignalType,
+    db: AsyncIOMotorClient = Depends(get_database),
+    signal_file: UploadFile = File(...),
 ):
+    file_id = await save_signal_file(db, signal_file)
+    # get metadata from file / db
     signal_metadata = SignalMetadata(
         extension="mp3",
         sample_rate=42_000,
         length=60,
         channels=2,
         signal_type=signal_type,
+        filename=signal_file.filename
     )
-    signal = SignalInCreate(signal_metadata=signal_metadata, signal_id="TEST")
-    signal_in_response = await create_signal(db, signal)
-    return SignalInResponse(signal=signal_in_response)
+    signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
+    signal_in_db = await create_signal(db, signal)
+    return SignalInResponse(signal=signal_in_db)
 
 
 @router.delete("/{signal_id}")
