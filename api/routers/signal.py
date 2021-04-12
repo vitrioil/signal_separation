@@ -1,3 +1,4 @@
+import itertools
 from typing import List
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
@@ -11,12 +12,21 @@ from api.schemas import (
     SignalInResponse,
     SignalInCreate,
 )
-from api.services import create_signal, read_signal, remove_signal, save_signal_file, read_signal_file
+from api.services import create_signal, read_signal, remove_signal, save_signal_file, read_signal_file, save_stem
 from api.db import get_database
+from api.utils.signal import split_audio
 
 router = APIRouter(
     prefix="/signal", tags=["signal"], responses={404: {"description": "Not found"}}
 )
+
+
+async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
+    # mem expensive
+    stream = await read_signal_file(db, signal.signal_metadata.filename)
+    stream = b''.join(itertools.chain.from_iterable(stream))
+    stems = split_audio(stream, signal.signal_metadata.extension, signal.signal_metadata.signal_type)
+    await save_stem(db, stems)
 
 
 @router.get("/", response_model=List[Signal])
@@ -39,6 +49,7 @@ async def post_signal(
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
 ):
+    # early validations for file extension / metadata based validation
     file_id = await save_signal_file(db, signal_file)
     # get metadata from file / db
     signal_metadata = SignalMetadata(

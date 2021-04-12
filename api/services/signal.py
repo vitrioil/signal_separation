@@ -1,9 +1,10 @@
+from typing import List
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from bson.objectid import ObjectId
 from fastapi import UploadFile
 from gridfs.errors import NoFile
 
-from api.schemas import SignalInResponse, Signal, SignalInDB
+from api.schemas import SignalInResponse, Signal, SignalInDB, SeparatedSignal
 from api.config import database_name, signal_collection_name, stem_collection_name
 
 
@@ -78,3 +79,7 @@ async def remove_signal(conn: AsyncIOMotorClient, signal_id: str):
         .delete_one({"signal_id": signal_id})
     )
     return rows.deleted_count == 1
+
+
+async def save_stem(conn: AsyncIOMotorClient, signal_id: str, stems: List[SeparatedSignal])
+    pass
