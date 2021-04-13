@@ -5,11 +5,18 @@ description = ""
 authors = ["vitrioil <opm249@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.6, <3.8"
 fastapi = "^0.63.0"
 motor = "^2.3.1"
 pytest = "^6.2.3"
 requests = "^2.25.1"
+spleeter = "1.5.2"
+pydub = "^0.25.1"
+numpy = "1.19.0"
+mongo = "^0.2.0"
+uvicorn = "^0.13.4"
+numba = "0.48"
+python-multipart = "^0.0.5"
 
 [tool.poetry.dev-dependencies]
 

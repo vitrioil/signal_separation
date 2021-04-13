@@ -23,9 +23,7 @@ if not MONGODB_URL:
     MONGO_USER = os.getenv("MONGO_USER", "signal_sep")
     MONGO_PASS = os.getenv("MONGO_PASSWORD", "signal_sep")
     MONGO_DB = os.getenv("MONGO_DB", "signal")
-    MONGODB_URL = (
-        f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}"
-    )
+    MONGODB_URL = f"mongodb://{MONGO_USER}:{MONGO_PASS}@{MONGO_HOST}:{MONGO_PORT}/{MONGO_DB}"
 
     MONGO_USER_TEST = os.getenv("MONGO_USER", "signal_sep_test")
     MONGO_PASS_TEST = os.getenv("MONGO_PASSWORD", "signal_sep_test")
