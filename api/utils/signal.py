@@ -1,9 +1,13 @@
 from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryFile
+
 import numpy as np
 from pydub import AudioSegment
+from fastapi import UploadFile
 
-from api.schemas import SignalType
-from api.separator import separate
+from api.schemas import SignalMetadata
+from api.separator import separate, SignalType
 
 
 def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
@@ -23,7 +27,11 @@ def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
 
 class AudioExtension:
     def read(stream: bytes):
-        signal = AudioSegment.from_file_using_temporary_files(BytesIO(stream), format="wav")#, sample_width=2, frame_rate=44_100, channels=2)
+        with TemporaryFile() as temp_file:
+            temp_file.write(stream)
+            temp_file.seek(0)
+            signal = AudioSegment.from_file(temp_file)
+
         signal, _ = pydub_to_np(signal)
         signal = np.transpose(signal, (1, 0))
         return signal
@@ -63,14 +71,31 @@ def audio_to_file_like(signal: np.ndarray):
         sample_width=signal.dtype.itemsize,
         channels=2,
     )
-    buffer = BytesIO()
-    audio_segment.export(buffer, format="wav")
-    buffer.seek(0)
-    return buffer
+    # buffer = BytesIO()
+    # audio_segment.export(buffer, format="wav")
+    # buffer.seek(0)
+    return audio_segment
 
 
 def split_audio(stream: bytes, extension: str, signal_type: SignalType):
     signal = read_audio(stream, extension)
     stems = separate(signal, signal_type)
-    stems = {k: audio_to_file_like(v) for k, v in stems.items()}
+    # stems = {k: audio_to_file_like(v) for k, v in stems.items()}
     return stems
+
+
+def process_signal(signal_file: UploadFile, signal_type: SignalType):
+    filename = signal_file.filename
+    extension = Path(filename).suffix
+    audio_segment = AudioSegment.from_file(signal_file.file)
+
+    signal_metadata = SignalMetadata(
+        extension=extension,
+        sample_rate=audio_segment.frame_rate,
+        duration=audio_segment.duration_seconds,
+        channels=audio_segment.channels,
+        sample_width=audio_segment.sample_width,
+        signal_type=signal_type,
+        filename=filename,
+    )
+    return signal_metadata

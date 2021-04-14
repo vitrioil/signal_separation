@@ -1,3 +1,6 @@
+import numpy as np
+import librosa
+from tempfile import TemporaryFile, NamedTemporaryFile
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from bson.objectid import ObjectId
 from fastapi import UploadFile
@@ -48,6 +51,7 @@ async def create_stem(conn: AsyncIOMotorClient, signal: SeparatedSignal):
 async def save_signal_file(conn: AsyncIOMotorClient, signal_file: UploadFile):
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db)
+    signal_file.file.seek(0)
     file_id = await fs.upload_from_stream(
         signal_file.filename,
         signal_file.file,
@@ -58,11 +62,16 @@ async def save_signal_file(conn: AsyncIOMotorClient, signal_file: UploadFile):
 
 
 async def save_stem_file(
-    conn: AsyncIOMotorClient, stem_name: str, signal: bytes
+    conn: AsyncIOMotorClient, stem_name: str, signal: np.ndarray
 ):
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db)
-    file_id = await fs.upload_from_stream(stem_name, signal)
+    with NamedTemporaryFile() as temp_file:
+        filename = temp_file.name
+        librosa.output.write_wav(
+            filename, np.asfortranarray(signal), sr=44_100
+        )
+        file_id = await fs.upload_from_stream(stem_name, temp_file)
     stem_id = str(file_id)
     return stem_id
 

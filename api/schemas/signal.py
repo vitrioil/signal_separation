@@ -12,12 +12,13 @@ class SignalMetadata(BaseModel):
     sample_rate: int = Field(
         ..., example=42_000, description="Sample rate of signal"
     )
-    length: int = Field(
-        ..., example=60, description="Length of signal in seconds"
+    duration: int = Field(
+        ..., example=60, description="Duration of signal in seconds"
     )
     channels: int = Field(
         ..., example=2, description="Number of channels of signal"
     )
+    sample_width: int = Field(..., example=2, description="Bytes per sample")
     signal_type: SignalType = Field(
         ..., example=SignalType.Music, description="Type of Signal"
     )

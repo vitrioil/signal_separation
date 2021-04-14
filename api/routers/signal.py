@@ -30,7 +30,7 @@ from api.services import (
 )
 from api.separator import SignalType
 from api.db import get_database
-from api.utils.signal import split_audio
+from api.utils.signal import split_audio, process_signal
 
 router = APIRouter(
     prefix="/signal",
@@ -67,9 +67,7 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     return signals
 
 
-@router.get(
-    "/stem/{filename}/{stem}"
-)
+@router.get("/stem/{filename}/{stem}")
 async def get_stem(
     filename: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
@@ -98,16 +96,13 @@ async def post_signal(
     signal_file: UploadFile = File(...),
 ):
     # early validations for file extension / metadata based validation
+    try:
+        signal_metadata = process_signal(signal_file, signal_type)
+    except Exception as e:
+        return HTTPException(
+            status_code=404, detail="Error while processing file"
+        )
     file_id = await save_signal_file(db, signal_file)
-    # get metadata from file / db
-    signal_metadata = SignalMetadata(
-        extension="mp3",
-        sample_rate=42_000,
-        length=60,
-        channels=2,
-        signal_type=signal_type,
-        filename=signal_file.filename,
-    )
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal)
     background_task.add_task(signal_separation_task, db, signal_in_db)
