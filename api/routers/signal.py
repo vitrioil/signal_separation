@@ -1,4 +1,3 @@
-import itertools
 from typing import List
 from fastapi.responses import StreamingResponse
 from fastapi import (
@@ -13,11 +12,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from api.schemas import (
     Signal,
-    SignalMetadata,
     SignalInResponse,
     SignalInCreate,
     SeparatedSignal,
-    SeparatedSignalInResponse,
 )
 from api.services import (
     create_signal,
@@ -51,7 +48,7 @@ async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
     )
 
     for stem_name, separate_signal in separated_signals.items():
-        stem_file_name = f"{stem_name}__{signal.signal_metadata.filename}"
+        stem_file_name = f"{stem_name}__{signal.signal_id}"
         stem_id = await save_stem_file(db, stem_file_name, separate_signal)
         stem = SeparatedSignal(
             signal_id=stem_id,
@@ -67,11 +64,11 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     return signals
 
 
-@router.get("/stem/{filename}/{stem}")
+@router.get("/stem/{signal_id}/{stem}")
 async def get_stem(
-    filename: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
+    signal_id: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
-    stem_file_name = f"{stem}__{filename}"
+    stem_file_name = f"{stem}__{signal_id}"
     stream = await read_signal_file(db, stem_file_name)
     if not stream:
         return HTTPException(status_code=404, detail="Stem not found")

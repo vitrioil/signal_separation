@@ -56,7 +56,3 @@ class SeparatedSignal(SignalBase):
 
 class SeparatedSignalInDB(DBModelMixin, SeparatedSignal):
     pass
-
-
-class SeparatedSignalInResponse(BaseModel):
-    stem: SeparatedSignalInDB

@@ -1,4 +1,3 @@
-from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryFile
 
@@ -25,62 +24,20 @@ def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
     )
 
 
-class AudioExtension:
-    def read(stream: bytes):
-        with TemporaryFile() as temp_file:
-            temp_file.write(stream)
-            temp_file.seek(0)
-            signal = AudioSegment.from_file(temp_file)
-
-        signal, _ = pydub_to_np(signal)
-        signal = np.transpose(signal, (1, 0))
-        return signal
-
-    def read_mp3(stream: bytes):
-        pass
-
-    def read_wav(stream: bytes):
-        pass
-
-    def read_flac(stream: bytes):
-        pass
-
-    def read_m4a(stream: bytes):
-        pass
-
-
 def read_audio(stream: bytes, extension: str):
-    return AudioExtension.read(stream)
+    with TemporaryFile() as temp_file:
+        temp_file.write(stream)
+        temp_file.seek(0)
+        signal = AudioSegment.from_file(temp_file)
 
-    # if extension.endswith("mp3"):
-    #     AudioExtension.read_mp3(stream)
-    # elif extension.endswith("wav"):
-    #     AudioExtension.read_wav(stream)
-    # elif extension.endswith("wav"):
-    #     AudioExtension.read_wav(stream)
-    # elif extension.endswith("flac"):
-    #     AudioExtension.read_flac(stream)
-    # else:
-    #     return
-
-
-def audio_to_file_like(signal: np.ndarray):
-    audio_segment = AudioSegment(
-        signal.tobytes(),
-        frame_rate=44_100,
-        sample_width=signal.dtype.itemsize,
-        channels=2,
-    )
-    # buffer = BytesIO()
-    # audio_segment.export(buffer, format="wav")
-    # buffer.seek(0)
-    return audio_segment
+    signal, _ = pydub_to_np(signal)
+    signal = np.transpose(signal, (1, 0))
+    return signal
 
 
 def split_audio(stream: bytes, extension: str, signal_type: SignalType):
     signal = read_audio(stream, extension)
     stems = separate(signal, signal_type)
-    # stems = {k: audio_to_file_like(v) for k, v in stems.items()}
     return stems
 
 
