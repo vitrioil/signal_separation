@@ -1,6 +1,7 @@
 import numpy as np
 import librosa
-from tempfile import TemporaryFile, NamedTemporaryFile
+from datetime import datetime
+from tempfile import NamedTemporaryFile
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from bson.objectid import ObjectId
 from fastapi import UploadFile
@@ -18,6 +19,31 @@ from api.config import (
 )
 
 
+def get_stem_id(stem_name: str, signal_id: str):
+    return f"{stem_name}__{signal_id}"
+
+
+async def read_one_signal(conn: AsyncIOMotorClient, signal_id: str):
+    row = (
+        await conn.get_default_database()
+        .get_collection(signal_collection_name)
+        .find_one({"signal_id": signal_id})
+    )
+    row = SignalInDB(**row)
+    return row
+
+
+async def read_signal(conn: AsyncIOMotorClient, length: int = 20):
+    rows = (
+        await conn.get_default_database()
+        .get_collection(signal_collection_name)
+        .find()
+        .to_list(length=length)
+    )
+    rows = list(map(lambda x: SignalInDB(**x), rows))
+    return rows
+
+
 async def create_signal(conn: AsyncIOMotorClient, signal: Signal):
     signal_in_db = SignalInDB(**signal.dict())
     row = (
@@ -31,6 +57,32 @@ async def create_signal(conn: AsyncIOMotorClient, signal: Signal):
     signal_in_db.updated_at = ObjectId(signal_in_db.id).generation_time
 
     return signal_in_db
+
+
+async def update_signal(
+    conn: AsyncIOMotorClient, signal_id: str, **update_kwargs
+):
+    signal = await read_one_signal(conn, signal_id)
+
+    signal = signal.dict()
+    signal = SignalInDB(**{**signal, **update_kwargs})
+    signal.updated_at = datetime.now()
+    await conn.get_default_database().get_collection(
+        signal_collection_name
+    ).replace_one({"signal_id": signal_id}, signal.dict())
+    return signal
+
+
+async def remove_signal(conn: AsyncIOMotorClient, signal_id: str, stem=False):
+    collection_name = signal_collection_name
+    if stem:
+        collection_name = stem_collection_name
+    rows = (
+        await conn.get_default_database()
+        .get_collection(collection_name)
+        .delete_one({"signal_id": signal_id})
+    )
+    return rows.deleted_count == 1
 
 
 async def create_stem(conn: AsyncIOMotorClient, signal: SeparatedSignal):
@@ -99,25 +151,10 @@ async def chunk_gen(grid_out):
         yield chunk
 
 
-async def read_one_signal(conn: AsyncIOMotorClient, signal_id: str):
-    pass
-
-
-async def read_signal(conn: AsyncIOMotorClient, length: int = 20):
-    rows = (
-        await conn.get_default_database()
-        .get_collection(signal_collection_name)
-        .find()
-        .to_list(length=length)
-    )
-    rows = list(map(lambda x: Signal(**x), rows))
-    return rows
-
-
-async def remove_signal(conn: AsyncIOMotorClient, signal_id: str):
-    rows = (
-        await conn.get_default_database()
-        .get_collection(signal_collection_name)
-        .delete_one({"signal_id": signal_id})
-    )
-    return rows.deleted_count == 1
+async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
+    db = conn.get_default_database()
+    fs = AsyncIOMotorGridFSBucket(db)
+    try:
+        await fs.delete(ObjectId(file_id))
+    except NoFile:
+        raise Exception("No File found")

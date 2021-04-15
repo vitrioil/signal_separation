@@ -24,6 +24,10 @@ from api.services import (
     save_signal_file,
     read_signal_file,
     save_stem_file,
+    update_signal,
+    get_stem_id,
+    read_one_signal,
+    delete_signal_file
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -47,20 +51,31 @@ async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
         signal.signal_metadata.signal_type,
     )
 
+    separated_stems = []
+    separated_stem_id = []
     for stem_name, separate_signal in separated_signals.items():
-        stem_file_name = f"{stem_name}__{signal.signal_id}"
-        stem_id = await save_stem_file(db, stem_file_name, separate_signal)
+        stem_file_id = get_stem_id(stem_name, signal.signal_id)
+        stem_id = await save_stem_file(db, stem_file_id, separate_signal)
+
+        separated_stems.append(stem_name)
+        separated_stem_id.append(stem_id)
         stem = SeparatedSignal(
             signal_id=stem_id,
             signal_metadata=signal.signal_metadata,
             stem_name=stem_name,
         )
+
         await create_stem(db, stem)
+    # store signal stem ids in original signal
+    await update_signal(
+        db, signal.signal_id, separated_stems=separated_stems, separated_stem_id=separated_stem_id
+    )
 
 
-@router.get("/", response_model=List[Signal])
+@router.get("/", response_model=List[SignalInResponse])
 async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     signals = await read_signal(db)
+    signals = list(map(lambda x: SignalInResponse(signal=x), signals))
     return signals
 
 
@@ -68,20 +83,10 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
 async def get_stem(
     signal_id: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
-    stem_file_name = f"{stem}__{signal_id}"
-    stream = await read_signal_file(db, stem_file_name)
+    stem_file_id = get_stem_id(stem, signal_id)
+    stream = await read_signal_file(db, stem_file_id)
     if not stream:
         return HTTPException(status_code=404, detail="Stem not found")
-    return StreamingResponse(stream)
-
-
-@router.get("/test_binary/{filename}")
-async def get_signal_file(
-    filename: str, db: AsyncIOMotorClient = Depends(get_database)
-):
-    stream = await read_signal_file(db, filename)
-    if not stream:
-        return HTTPException(status_code=404, detail="File not found")
     return StreamingResponse(stream)
 
 
@@ -95,7 +100,7 @@ async def post_signal(
     # early validations for file extension / metadata based validation
     try:
         signal_metadata = process_signal(signal_file, signal_type)
-    except Exception as e:
+    except Exception:
         return HTTPException(
             status_code=404, detail="Error while processing file"
         )
@@ -110,5 +115,15 @@ async def post_signal(
 async def delete_signal(
     signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
+    signal = await read_one_signal(db, signal_id)
+    stem_ids = signal.separated_stem_id
+
+    # Delete stem files and from collection
+    for stem_id in stem_ids:
+        await delete_signal_file(db, stem_id)
+        deleted = await remove_signal(db, stem_id, stem=True)
+
+    # Delete signal file and from collection
+    await delete_signal_file(db, signal_id)
     deleted = await remove_signal(db, signal_id)
     return {"signal_id": signal_id, "deleted": deleted}

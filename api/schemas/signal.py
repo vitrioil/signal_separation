@@ -31,8 +31,8 @@ class SignalBase(BaseModel):
 
 
 class Signal(SignalBase):
-    separated_stem_id: List[str] = Field(
-        [], description="Signal ID of separated stems"
+    separated_stems: List[str] = Field(
+        [], description="Name of stems"
     )
 
 
@@ -41,11 +41,13 @@ class SignalInCreate(Signal):
 
 
 class SignalInDB(DBModelMixin, Signal):
-    pass
+    separated_stem_id: List[str] = Field(
+        [], description="Signal ID of Stems"
+    )
 
 
 class SignalInResponse(BaseModel):
-    signal: SignalInDB
+    signal: Signal
 
 
 class SeparatedSignal(SignalBase):
