@@ -29,7 +29,8 @@ async def read_one_signal(conn: AsyncIOMotorClient, signal_id: str):
         .get_collection(signal_collection_name)
         .find_one({"signal_id": signal_id})
     )
-    row = SignalInDB(**row)
+    if row:
+        row = SignalInDB(**row)
     return row
 
 

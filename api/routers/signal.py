@@ -7,6 +7,7 @@ from fastapi import (
     File,
     Depends,
     BackgroundTasks,
+    status,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -27,11 +28,11 @@ from api.services import (
     update_signal,
     get_stem_id,
     read_one_signal,
-    delete_signal_file
+    delete_signal_file,
 )
-from api.separator import SignalType
+from api.separator import Separator
 from api.db import get_database
-from api.utils.signal import split_audio, process_signal
+from api.utils.signal import split_audio, process_signal, get_separator
 
 router = APIRouter(
     prefix="/signal",
@@ -40,12 +41,15 @@ router = APIRouter(
 )
 
 
-async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
+async def signal_separation_task(
+    separator: Separator, db: AsyncIOMotorClient, signal: Signal
+):
     # mem expensive
     stream = await read_signal_file(
         db, signal.signal_metadata.filename, stream=False
     )
     separated_signals = split_audio(
+        separator,
         stream,
         signal.signal_metadata.extension,
         signal.signal_metadata.signal_type,
@@ -68,7 +72,10 @@ async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
         await create_stem(db, stem)
     # store signal stem ids in original signal
     await update_signal(
-        db, signal.signal_id, separated_stems=separated_stems, separated_stem_id=separated_stem_id
+        db,
+        signal.signal_id,
+        separated_stems=separated_stems,
+        separated_stem_id=separated_stem_id,
     )
 
 
@@ -90,14 +97,22 @@ async def get_stem(
     return StreamingResponse(stream)
 
 
-@router.post("/{signal_type}", response_model=SignalInResponse)
+@router.post(
+    "/{signal_type}",
+    response_model=SignalInResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def post_signal(
-    signal_type: SignalType,
     background_task: BackgroundTasks,
+    separator_type: dict = Depends(get_separator),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
 ):
     # early validations for file extension / metadata based validation
+    separator, signal_type = (
+        separator_type.get("separator"),
+        separator_type.get("signal_type"),
+    )
     try:
         signal_metadata = process_signal(signal_file, signal_type)
     except Exception:
@@ -107,7 +122,9 @@ async def post_signal(
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal)
-    background_task.add_task(signal_separation_task, db, signal_in_db)
+    background_task.add_task(
+        signal_separation_task, separator, db, signal_in_db
+    )
     return SignalInResponse(signal=signal_in_db)
 
 
@@ -116,6 +133,9 @@ async def delete_signal(
     signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
     signal = await read_one_signal(db, signal_id)
+    if not signal:
+        return HTTPException(status_code=404, detail="Signal does not exist")
+
     stem_ids = signal.separated_stem_id
 
     # Delete stem files and from collection

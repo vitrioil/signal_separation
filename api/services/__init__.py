@@ -9,5 +9,5 @@ from .signal import (
     update_signal,
     get_stem_id,
     read_one_signal,
-    delete_signal_file
+    delete_signal_file,
 )
