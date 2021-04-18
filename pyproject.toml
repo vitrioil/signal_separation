@@ -17,6 +17,7 @@ mongo = "^0.2.0"
 uvicorn = "^0.13.4"
 numba = "0.48"
 python-multipart = "^0.0.5"
+pytest-asyncio = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
 pylama = "^7.7.1"

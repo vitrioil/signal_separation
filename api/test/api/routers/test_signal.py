@@ -1,4 +1,6 @@
 import pytest
+import asyncio
+from tempfile import NamedTemporaryFile
 from fastapi.testclient import TestClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -8,7 +10,12 @@ import numpy as np
 from api.db import get_database
 from api.utils.signal import get_separator
 from api.separator import Separator as ABCSeparator, SignalType
-from api.config import MONGODB_TEST_URL
+from api.config import (
+    MONGODB_TEST_URL,
+    signal_collection_name,
+    stem_collection_name,
+    grid_bucket_name,
+)
 from api.main import api
 
 
@@ -41,12 +48,33 @@ def signal(tmp_path):
     return file_path.as_posix()
 
 
+# set the event loop for cleanup
+@pytest.fixture
+def loop():
+    return asyncio.get_event_loop()
+
+
+# cleanup after running unit test
+@pytest.fixture
+async def cleanup_db(loop):
+    yield
+    db = await override_get_database()
+    await db.get_default_database().drop_collection(stem_collection_name)
+    await db.get_default_database().drop_collection(signal_collection_name)
+    await db.get_default_database().drop_collection(
+        f"{grid_bucket_name}.files"
+    )
+    await db.get_default_database().drop_collection(
+        f"{grid_bucket_name}.chunks"
+    )
+
+
 api.dependency_overrides[get_database] = override_get_database
 api.dependency_overrides[get_separator] = override_get_separator
 client = TestClient(api)
 
 
-def test_signal_music(signal):
+def test_signal_music(signal, cleanup_db):
     stems = 2
 
     response = client.post(
@@ -71,13 +99,20 @@ def test_signal_music(signal):
     # only true if db is empty before running unit test
     assert len(data) == 1
 
-    # test for streaming response
-    # response = client.get(f"/signal/stem/{signal_id}/{stem_names[0]}")
+    response = client.get(f"/signal/stem/{signal_id}/{stem_names[0]}")
+    data = response.content
+    with NamedTemporaryFile() as temp_file:
+        temp_file.write(data)
+        temp_file.seek(0)
+        signal = AudioSegment.from_file(temp_file)
+    assert signal.duration_seconds == 10
+    assert response.status_code == 200
 
     response = client.delete(f"/signal/{signal_id}")
     data = response.json()
     assert data["signal_id"] == signal_id
     assert data["deleted"]
+    assert response.status_code == 202
 
-    # response = client.delete(f"/signal/{signal_id}")
-    # assert response.status_code == 404 #fails..
+    response = client.delete(f"/signal/{signal_id}")
+    assert response.status_code == 404

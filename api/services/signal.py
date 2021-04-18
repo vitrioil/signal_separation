@@ -16,6 +16,7 @@ from api.schemas import (
 from api.config import (
     signal_collection_name,
     stem_collection_name,
+    grid_bucket_name,
 )
 
 
@@ -103,7 +104,7 @@ async def create_stem(conn: AsyncIOMotorClient, signal: SeparatedSignal):
 
 async def save_signal_file(conn: AsyncIOMotorClient, signal_file: UploadFile):
     db = conn.get_default_database()
-    fs = AsyncIOMotorGridFSBucket(db)
+    fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     signal_file.file.seek(0)
     file_id = await fs.upload_from_stream(
         signal_file.filename,
@@ -115,14 +116,17 @@ async def save_signal_file(conn: AsyncIOMotorClient, signal_file: UploadFile):
 
 
 async def save_stem_file(
-    conn: AsyncIOMotorClient, stem_name: str, signal: np.ndarray
+    conn: AsyncIOMotorClient,
+    stem_name: str,
+    signal: np.ndarray,
+    sample_rate: int,
 ):
     db = conn.get_default_database()
-    fs = AsyncIOMotorGridFSBucket(db)
+    fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     with NamedTemporaryFile() as temp_file:
         filename = temp_file.name
         librosa.output.write_wav(
-            filename, np.asfortranarray(signal), sr=44_100
+            filename, np.asfortranarray(signal), sr=sample_rate
         )
         file_id = await fs.upload_from_stream(stem_name, temp_file)
     stem_id = str(file_id)
@@ -133,7 +137,7 @@ async def read_signal_file(
     conn: AsyncIOMotorClient, filename: str, stream=True
 ):
     db = conn.get_default_database()
-    fs = AsyncIOMotorGridFSBucket(db)
+    fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     try:
         grid_out = await fs.open_download_stream_by_name(filename)
     except NoFile:
@@ -154,7 +158,7 @@ async def chunk_gen(grid_out):
 
 async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
     db = conn.get_default_database()
-    fs = AsyncIOMotorGridFSBucket(db)
+    fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     try:
         await fs.delete(ObjectId(file_id))
     except NoFile:

@@ -36,5 +36,6 @@ database_name = MONGO_DB
 
 signal_collection_name = "signal"
 stem_collection_name = "stem"
+grid_bucket_name = "fs"
 
 augment_collection_name = "augment"

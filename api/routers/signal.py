@@ -59,7 +59,12 @@ async def signal_separation_task(
     separated_stem_id = []
     for stem_name, separate_signal in separated_signals.items():
         stem_file_id = get_stem_id(stem_name, signal.signal_id)
-        stem_id = await save_stem_file(db, stem_file_id, separate_signal)
+        stem_id = await save_stem_file(
+            db,
+            stem_file_id,
+            separate_signal,
+            signal.signal_metadata.sample_rate,
+        )
 
         separated_stems.append(stem_name)
         separated_stem_id.append(stem_id)
@@ -79,21 +84,21 @@ async def signal_separation_task(
     )
 
 
-@router.get("/", response_model=List[SignalInResponse])
+@router.get("/", response_model=List[SignalInResponse], status_code=status.HTTP_200_OK)
 async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     signals = await read_signal(db)
     signals = list(map(lambda x: SignalInResponse(signal=x), signals))
     return signals
 
 
-@router.get("/stem/{signal_id}/{stem}")
+@router.get("/stem/{signal_id}/{stem}", status_code=status.HTTP_200_OK)
 async def get_stem(
     signal_id: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
     stem_file_id = get_stem_id(stem, signal_id)
     stream = await read_signal_file(db, stem_file_id)
     if not stream:
-        return HTTPException(status_code=404, detail="Stem not found")
+        raise HTTPException(status_code=404, detail="Stem not found")
     return StreamingResponse(stream)
 
 
@@ -116,7 +121,7 @@ async def post_signal(
     try:
         signal_metadata = process_signal(signal_file, signal_type)
     except Exception:
-        return HTTPException(
+        raise HTTPException(
             status_code=404, detail="Error while processing file"
         )
     file_id = await save_signal_file(db, signal_file)
@@ -128,13 +133,13 @@ async def post_signal(
     return SignalInResponse(signal=signal_in_db)
 
 
-@router.delete("/{signal_id}")
+@router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)
 async def delete_signal(
     signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
 ):
     signal = await read_one_signal(db, signal_id)
     if not signal:
-        return HTTPException(status_code=404, detail="Signal does not exist")
+        raise HTTPException(status_code=404, detail="Signal does not exist")
 
     stem_ids = signal.separated_stem_id
 
