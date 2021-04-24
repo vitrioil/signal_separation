@@ -1,3 +1,4 @@
+import orjson
 from typing import List
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,9 @@ class SignalBase(BaseModel):
 
 class Signal(SignalBase):
     separated_stems: List[str] = Field([], description="Name of stems")
+
+    class Config:
+        json_loads = orjson.loads
 
 
 class SignalInCreate(Signal):

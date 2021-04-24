@@ -29,7 +29,9 @@ class SpleeterSeparator(ABCSeparator):
         # in minutes
         self.chunk_size = int(chunk_size * 60)
 
-        self._separator = Separator(f"spleeter:{self.stems}stems")
+        self._separator = Separator(
+            f"spleeter:{self.stems}stems", multiprocess=False
+        )
 
         # spleeter specific config
         self._audio_adapter = get_default_audio_adapter()

@@ -43,7 +43,7 @@ def split_audio(
 
 def process_signal(signal_file: UploadFile, signal_type: SignalType):
     filename = signal_file.filename
-    extension = Path(filename).suffix
+    extension = Path(filename).suffix.replace(".", "")
     audio_segment = AudioSegment.from_file(signal_file.file)
 
     signal_metadata = SignalMetadata(
