@@ -23,26 +23,32 @@ def get_separator(signal_type: SignalType, stems: int):
     return separator
 
 
-@app.task
-def separate(signal: dict, stems: int = 2):
+@app.task(bind=True)
+def separate(self, signal: dict, stems: int = 2):
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_separate(signal, stems))
+    return loop.run_until_complete(_separate(self, signal, stems))
 
 
-async def _separate(signal: dict, stems: int):
+async def _separate(self, signal: dict, stems: int):
+    # TODO: separate out db dependency
     await connect_to_mongo()
     db = await get_database()
+    self.update_state(state="PROGRESS", meta={"state": "init"})
 
     signal = Signal(**signal)
     signal_type = signal.signal_metadata.signal_type
     separator = get_separator(signal_type, stems)
-    # mem expensive
+
+    # TODO: use generators, mem expensive
     stream = await read_signal_file(
         db, signal.signal_metadata.filename, stream=False
     )
+    self.update_state(state="PROGRESS", meta={"state": "start"})
+
     separated_signals = split_audio(
         separator, stream, signal.signal_metadata.extension, signal_type,
     )
+    self.update_state(state="PROGRESS", meta={"state": "separated"})
 
     separated_stems = []
     separated_stem_id = []
@@ -64,6 +70,8 @@ async def _separate(signal: dict, stems: int):
         )
 
         await create_stem(db, stem)
+    self.update_state(state="PROGRESS", meta={"state": "storing"})
+
     # store signal stem ids in original signal
     await update_signal(
         db,
@@ -71,3 +79,4 @@ async def _separate(signal: dict, stems: int):
         separated_stems=separated_stems,
         separated_stem_id=separated_stem_id,
     )
+    self.update_state(state="PROGRESS", meta={"state": "complete"})

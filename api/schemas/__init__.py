@@ -7,4 +7,6 @@ from .signal import (
     SignalInDB,
     SeparatedSignal,
     SeparatedSignalInDB,
+    SignalState,
+    SignalStateInDB,
 )

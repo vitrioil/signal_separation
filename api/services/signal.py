@@ -12,11 +12,13 @@ from api.schemas import (
     SignalInDB,
     SeparatedSignal,
     SeparatedSignalInDB,
+    SignalState,
 )
 from api.config import (
     signal_collection_name,
     stem_collection_name,
     grid_bucket_name,
+    signal_state_collection_name,
 )
 
 
@@ -163,3 +165,32 @@ async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
         await fs.delete(ObjectId(file_id))
     except NoFile:
         raise Exception("No File found")
+
+
+async def get_signal_state(conn: AsyncIOMotorClient, signal_id: str):
+    row = (
+        await conn.get_default_database()
+        .get_collection(signal_state_collection_name)
+        .find_one({"signal_id": signal_id})
+    )
+    print(row)
+    if row:
+        signal_state = SignalState(**row)
+        return signal_state
+
+
+async def update_signal_state(
+    conn: AsyncIOMotorClient, signal_id: str, state: str
+):
+    signal_state = SignalState(signal_id=signal_id, signal_state=state)
+    row = (
+        await conn.get_default_database()
+        .get_collection(signal_state_collection_name)
+        .update_one(
+            {"signal_id": signal_id},
+            {"$set": {"signal_state": signal_state.signal_state}},
+            upsert=True,
+        )
+    )
+    if row:
+        return signal_state

@@ -2,21 +2,19 @@ import pytest
 import asyncio
 from tempfile import NamedTemporaryFile
 from fastapi.testclient import TestClient
-from motor.motor_asyncio import AsyncIOMotorClient
 
 from pydub import AudioSegment
 import numpy as np
 
 from api.db import get_database
-from api.utils.signal import get_separator
 from api.separator import Separator as ABCSeparator, SignalType
 from api.config import (
-    MONGODB_TEST_URL,
     signal_collection_name,
     stem_collection_name,
     grid_bucket_name,
 )
 from api.main import api
+from ..conftest import override_get_database
 
 
 class TestSeparator(ABCSeparator):
@@ -28,9 +26,8 @@ class TestSeparator(ABCSeparator):
         return predictions
 
 
-async def override_get_database():
-    db = AsyncIOMotorClient(MONGODB_TEST_URL)
-    return db
+async def _override_get_database():
+    return override_get_database()
 
 
 def override_get_separator(signal_type: SignalType, stems: int = 2):
@@ -69,8 +66,8 @@ async def cleanup_db(loop):
     )
 
 
-api.dependency_overrides[get_database] = override_get_database
-api.dependency_overrides[get_separator] = override_get_separator
+api.dependency_overrides[get_database] = _override_get_database
+# api.dependency_overrides[get_separator] = override_get_separator
 client = TestClient(api)
 
 

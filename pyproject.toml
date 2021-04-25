@@ -5,7 +5,7 @@ description = ""
 authors = ["vitrioil <opm249@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.6, <3.8"
+python = ">=3.7, <3.8"
 fastapi = "^0.63.0"
 motor = "^2.3.1"
 pytest = "^6.2.3"
@@ -23,6 +23,7 @@ orjson = "^3.5.2"
 
 [tool.poetry.dev-dependencies]
 pylama = "^7.7.1"
+pytest-celery = "^0.0.0-alpha.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

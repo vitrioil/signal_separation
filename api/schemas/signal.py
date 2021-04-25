@@ -58,3 +58,12 @@ class SeparatedSignal(SignalBase):
 
 class SeparatedSignalInDB(DBModelMixin, SeparatedSignal):
     pass
+
+
+class SignalState(BaseModel):
+    signal_id: str = Field(..., description="Signal ID")
+    signal_state: str = Field(..., description="Signal State")
+
+
+class SignalStateInDB(DBModelMixin, SignalState):
+    pass

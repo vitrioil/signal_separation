@@ -8,6 +8,7 @@ from fastapi import (
     Depends,
     BackgroundTasks,
     status,
+    WebSocket,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -15,6 +16,7 @@ from api.schemas import (
     Signal,
     SignalInResponse,
     SignalInCreate,
+    SignalState,
 )
 from api.services import (
     create_signal,
@@ -25,6 +27,8 @@ from api.services import (
     get_stem_id,
     read_one_signal,
     delete_signal_file,
+    get_signal_state,
+    update_signal_state,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -38,8 +42,26 @@ router = APIRouter(
 )
 
 
-async def signal_separation_task(signal: Signal):
-    separate.apply_async((signal.dict(),))
+class TaskManager:
+    def __init__(self):
+        pass
+
+
+async def task_message_handler(db, signal_id, state):
+    result = state.get("result")
+    if result:
+        await update_signal_state(db, signal_id, result.get("state", ""))
+
+
+async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
+    result = separate.delay(signal.dict())
+    result.get(
+        on_message=lambda x: (
+            await task_message_handler(db, signal.signal_id, x) for _ in "_"
+        )
+        .__anext__()
+        .send(None)
+    )
 
 
 @router.get(
@@ -51,13 +73,30 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     return signals
 
 
-@router.get("/stem/status/{signal_id}")
+@router.get("/stem/state/{signal_id}", response_model=SignalState)
+async def get_stem_state(
+    signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
+):
+    signal_state = await get_signal_state(db, signal_id)
+    if signal_state:
+        return signal_state
+    raise HTTPException(status_code=404, detail="Signal not found")
+
+
+@router.websocket("/stem/status/{signal_id}")
 async def get_stem_processing_status(
-    # websocket: WebSocket,
+    websocket: WebSocket,
     signal_id: str,
     db: AsyncIOMotorClient = Depends(get_database),
 ):
-    pass
+    signal_state = await get_signal_state(db, signal_id)
+    if signal_state.signal_state == "completed":
+        return {"state": signal_state.signal_state}
+
+    await websocket.accept()
+    while True:
+        pass
+    await websocket.close()
 
 
 @router.get("/stem/{signal_id}/{stem}", status_code=status.HTTP_200_OK)
@@ -79,15 +118,10 @@ async def get_stem(
 async def post_signal(
     background_task: BackgroundTasks,
     signal_type: SignalType,
-    # separator_type: dict = Depends(get_separator),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
 ):
     # early validations for file extension / metadata based validation
-    # separator, signal_type = (
-    #     separator_type.get("separator"),
-    #     separator_type.get("signal_type"),
-    # )
     try:
         signal_metadata = process_signal(signal_file, signal_type)
     except Exception:
@@ -97,7 +131,7 @@ async def post_signal(
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal)
-    background_task.add_task(signal_separation_task, signal_in_db)
+    background_task.add_task(signal_separation_task, db, signal_in_db)
     return SignalInResponse(signal=signal_in_db)
 
 

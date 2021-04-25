@@ -10,4 +10,6 @@ from .signal import (
     get_stem_id,
     read_one_signal,
     delete_signal_file,
+    get_signal_state,
+    update_signal_state,
 )

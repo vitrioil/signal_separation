@@ -6,7 +6,7 @@ from pydub import AudioSegment
 from fastapi import UploadFile
 
 from api.schemas import SignalMetadata
-from api.separator import Separator, SignalType, SpleeterSeparator
+from api.separator import Separator, SignalType
 
 
 def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
@@ -56,9 +56,3 @@ def process_signal(signal_file: UploadFile, signal_type: SignalType):
         filename=filename,
     )
     return signal_metadata
-
-
-def get_separator(signal_type: SignalType, stems: int = 2):
-    if signal_type == SignalType.Music:
-        separator = SpleeterSeparator(stems=stems)
-    return {"signal_type": signal_type, "separator": separator}
