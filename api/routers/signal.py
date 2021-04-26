@@ -29,6 +29,7 @@ from api.services import (
     delete_signal_file,
     get_signal_state,
     update_signal_state,
+    listen_signal_state_change,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -42,11 +43,6 @@ router = APIRouter(
 )
 
 
-class TaskManager:
-    def __init__(self):
-        pass
-
-
 async def task_message_handler(db, signal_id, state):
     result = state.get("result")
     if result:
@@ -55,13 +51,13 @@ async def task_message_handler(db, signal_id, state):
 
 async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
     result = separate.delay(signal.dict())
-    result.get(
-        on_message=lambda x: (
-            await task_message_handler(db, signal.signal_id, x) for _ in "_"
-        )
-        .__anext__()
-        .send(None)
-    )
+    # result.get(
+    #     on_message=lambda x: (
+    #         await task_message_handler(db, signal.signal_id, x) for _ in "_"
+    #     )
+    #     .__anext__()
+    #     .send(None)
+    # )
 
 
 @router.get(
@@ -83,19 +79,20 @@ async def get_stem_state(
     raise HTTPException(status_code=404, detail="Signal not found")
 
 
-@router.websocket("/stem/status/{signal_id}")
+@router.websocket("/status/{signal_id}")
 async def get_stem_processing_status(
     websocket: WebSocket,
     signal_id: str,
     db: AsyncIOMotorClient = Depends(get_database),
 ):
     signal_state = await get_signal_state(db, signal_id)
-    if signal_state.signal_state == "completed":
+    if signal_state and signal_state.signal_state == "completed":
         return {"state": signal_state.signal_state}
 
     await websocket.accept()
-    while True:
-        pass
+    await websocket.send_text(f"Message text was")
+    async for stream in listen_signal_state_change(db, signal_id):
+        await websocket.send_text(stream["fullDocument"]["state"])
     await websocket.close()
 
 

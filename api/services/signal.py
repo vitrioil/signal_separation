@@ -194,3 +194,13 @@ async def update_signal_state(
     )
     if row:
         return signal_state
+
+
+async def listen_signal_state_change(conn: AsyncIOMotorClient, signal_id: str):
+    collection = conn.get_default_database().get_collection(
+        signal_state_collection_name
+    )
+
+    async with collection.watch(full_document='updateLookup') as change_stream:
+        async for change in change_stream:
+            yield change

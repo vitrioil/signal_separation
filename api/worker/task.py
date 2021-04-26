@@ -10,6 +10,7 @@ from api.services import (
     save_stem_file,
     update_signal,
     get_stem_id,
+    update_signal_state,
 )
 from api.separator import SignalType, SpleeterSeparator
 from celery.utils.log import get_task_logger
@@ -33,9 +34,13 @@ async def _separate(self, signal: dict, stems: int):
     # TODO: separate out db dependency
     await connect_to_mongo()
     db = await get_database()
-    self.update_state(state="PROGRESS", meta={"state": "init"})
 
     signal = Signal(**signal)
+    signal_id = signal.signal_id
+
+    self.update_state(state="PROGRESS", meta={"state": "init"})
+    await update_signal_state(db, signal_id, "init")
+
     signal_type = signal.signal_metadata.signal_type
     separator = get_separator(signal_type, stems)
 
@@ -44,11 +49,13 @@ async def _separate(self, signal: dict, stems: int):
         db, signal.signal_metadata.filename, stream=False
     )
     self.update_state(state="PROGRESS", meta={"state": "start"})
+    await update_signal_state(db, signal_id, "start")
 
     separated_signals = split_audio(
         separator, stream, signal.signal_metadata.extension, signal_type,
     )
     self.update_state(state="PROGRESS", meta={"state": "separated"})
+    await update_signal_state(db, signal_id, "separated")
 
     separated_stems = []
     separated_stem_id = []
@@ -71,6 +78,7 @@ async def _separate(self, signal: dict, stems: int):
 
         await create_stem(db, stem)
     self.update_state(state="PROGRESS", meta={"state": "storing"})
+    await update_signal_state(db, signal_id, "storing")
 
     # store signal stem ids in original signal
     await update_signal(
@@ -80,3 +88,4 @@ async def _separate(self, signal: dict, stems: int):
         separated_stem_id=separated_stem_id,
     )
     self.update_state(state="PROGRESS", meta={"state": "complete"})
+    await update_signal_state(db, signal_id, "complete")
