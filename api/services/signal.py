@@ -183,6 +183,7 @@ async def update_signal_state(
     conn: AsyncIOMotorClient, signal_id: str, state: str
 ):
     signal_state = SignalState(signal_id=signal_id, signal_state=state)
+    print(signal_state)
     row = (
         await conn.get_default_database()
         .get_collection(signal_state_collection_name)
@@ -196,11 +197,30 @@ async def update_signal_state(
         return signal_state
 
 
-async def listen_signal_state_change(conn: AsyncIOMotorClient, signal_id: str):
+async def watch_collection_field(
+    conn: AsyncIOMotorClient, field: str, field_name: str = "signal_id"
+):
     collection = conn.get_default_database().get_collection(
         signal_state_collection_name
     )
 
-    async with collection.watch(full_document='updateLookup') as change_stream:
+    pipeline = [
+        {
+            "$match": {
+                "$and": [
+                    {
+                        "operationType": {
+                            "$in": ["insert", "update", "replace"]
+                        },
+                        f"fullDocument.{field_name}": field,
+                    }
+                ]
+            }
+        }
+    ]
+    async with collection.watch(
+        pipeline=pipeline, full_document="updateLookup"
+    ) as change_stream:
         async for change in change_stream:
-            yield change
+            data = change["updateDescription"]["updatedFields"]
+            yield data

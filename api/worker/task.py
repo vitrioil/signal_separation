@@ -1,7 +1,8 @@
 import asyncio
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from api.db import get_database, connect_to_mongo
-from api.worker import app
+from api.worker import app, TaskState
 from api.schemas import Signal, SeparatedSignal
 from api.utils.signal import split_audio
 from api.services import (
@@ -13,15 +14,19 @@ from api.services import (
     update_signal_state,
 )
 from api.separator import SignalType, SpleeterSeparator
-from celery.utils.log import get_task_logger
-
-logger = get_task_logger(__name__)
 
 
 def get_separator(signal_type: SignalType, stems: int):
     if signal_type == SignalType.Music:
         separator = SpleeterSeparator(stems=stems)
     return separator
+
+
+async def _update_state(
+    self, db: AsyncIOMotorClient, signal_id: str, state: TaskState
+):
+    self.update_state(state="PROGRESS", meta={"state": state})
+    await update_signal_state(db, signal_id, state)
 
 
 @app.task(bind=True)
@@ -38,8 +43,8 @@ async def _separate(self, signal: dict, stems: int):
     signal = Signal(**signal)
     signal_id = signal.signal_id
 
-    self.update_state(state="PROGRESS", meta={"state": "init"})
-    await update_signal_state(db, signal_id, "init")
+    await _update_state(self, db, signal_id, TaskState.Start)
+    await asyncio.sleep(5)
 
     signal_type = signal.signal_metadata.signal_type
     separator = get_separator(signal_type, stems)
@@ -48,14 +53,12 @@ async def _separate(self, signal: dict, stems: int):
     stream = await read_signal_file(
         db, signal.signal_metadata.filename, stream=False
     )
-    self.update_state(state="PROGRESS", meta={"state": "start"})
-    await update_signal_state(db, signal_id, "start")
+    await _update_state(self, db, signal_id, TaskState.Separating)
 
     separated_signals = split_audio(
         separator, stream, signal.signal_metadata.extension, signal_type,
     )
-    self.update_state(state="PROGRESS", meta={"state": "separated"})
-    await update_signal_state(db, signal_id, "separated")
+    await _update_state(self, db, signal_id, TaskState.Separated)
 
     separated_stems = []
     separated_stem_id = []
@@ -77,8 +80,7 @@ async def _separate(self, signal: dict, stems: int):
         )
 
         await create_stem(db, stem)
-    self.update_state(state="PROGRESS", meta={"state": "storing"})
-    await update_signal_state(db, signal_id, "storing")
+    await _update_state(self, db, signal_id, TaskState.Saving)
 
     # store signal stem ids in original signal
     await update_signal(
@@ -87,5 +89,4 @@ async def _separate(self, signal: dict, stems: int):
         separated_stems=separated_stems,
         separated_stem_id=separated_stem_id,
     )
-    self.update_state(state="PROGRESS", meta={"state": "complete"})
-    await update_signal_state(db, signal_id, "complete")
+    await _update_state(self, db, signal_id, TaskState.Complete)

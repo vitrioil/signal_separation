@@ -1,6 +1,7 @@
 from typing import List
 from fastapi.responses import StreamingResponse
 from fastapi import (
+    # Request,
     APIRouter,
     HTTPException,
     UploadFile,
@@ -11,6 +12,7 @@ from fastapi import (
     WebSocket,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
+# from sse_starlette.sse import EventSourceResponse
 
 from api.schemas import (
     Signal,
@@ -28,13 +30,12 @@ from api.services import (
     read_one_signal,
     delete_signal_file,
     get_signal_state,
-    update_signal_state,
-    listen_signal_state_change,
+    watch_collection_field,
 )
 from api.separator import SignalType
 from api.db import get_database
 from api.utils.signal import process_signal
-from api.worker import separate
+from api.worker import separate, TaskState
 
 router = APIRouter(
     prefix="/signal",
@@ -43,21 +44,8 @@ router = APIRouter(
 )
 
 
-async def task_message_handler(db, signal_id, state):
-    result = state.get("result")
-    if result:
-        await update_signal_state(db, signal_id, result.get("state", ""))
-
-
 async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
-    result = separate.delay(signal.dict())
-    # result.get(
-    #     on_message=lambda x: (
-    #         await task_message_handler(db, signal.signal_id, x) for _ in "_"
-    #     )
-    #     .__anext__()
-    #     .send(None)
-    # )
+    separate.delay(signal.dict())
 
 
 @router.get(
@@ -85,15 +73,26 @@ async def get_stem_processing_status(
     signal_id: str,
     db: AsyncIOMotorClient = Depends(get_database),
 ):
-    signal_state = await get_signal_state(db, signal_id)
-    if signal_state and signal_state.signal_state == "completed":
-        return {"state": signal_state.signal_state}
-
     await websocket.accept()
-    await websocket.send_text(f"Message text was")
-    async for stream in listen_signal_state_change(db, signal_id):
-        await websocket.send_text(stream["fullDocument"]["state"])
+
+    signal_state = await get_signal_state(db, signal_id)
+    if signal_state and signal_state.signal_state == TaskState.Complete:
+        await websocket.send_text(signal_state.signal_state)
+        await websocket.close()
+        return
+
+    async for stream in watch_collection_field(db, signal_id):
+        state = stream["signal_state"]
+        await websocket.send_text(state)
     await websocket.close()
+
+
+# @router.get("/state/")
+# async def get_state(
+#     request: Request, db: AsyncIOMotorClient = Depends(get_database)
+# ):
+#     event_gen = watch_collection_field(db, sig)
+#     return EventSourceResponse(event_gen)
 
 
 @router.get("/stem/{signal_id}/{stem}", status_code=status.HTTP_200_OK)

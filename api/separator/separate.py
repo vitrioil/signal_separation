@@ -2,7 +2,8 @@ import numpy as np
 from typing import Union
 
 from spleeter.separator import Separator
-from spleeter.audio.adapter import get_default_audio_adapter
+
+# from spleeter.audio.adapter import get_default_audio_adapter
 
 from api.separator import Separator as ABCSeparator
 
@@ -34,7 +35,7 @@ class SpleeterSeparator(ABCSeparator):
         )
 
         # spleeter specific config
-        self._audio_adapter = get_default_audio_adapter()
+        # self._audio_adapter = get_default_audio_adapter()
 
     def _chunk(self, waveform, sr):
         length = len(waveform) // sr
