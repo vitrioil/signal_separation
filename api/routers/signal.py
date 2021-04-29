@@ -2,6 +2,7 @@ from typing import List
 from fastapi.responses import StreamingResponse
 from fastapi import (
     # Request,
+    Path,
     APIRouter,
     HTTPException,
     UploadFile,
@@ -12,10 +13,10 @@ from fastapi import (
     WebSocket,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
+
 # from sse_starlette.sse import EventSourceResponse
 
 from api.schemas import (
-    Signal,
     SignalInResponse,
     SignalInCreate,
     SignalState,
@@ -44,23 +45,27 @@ router = APIRouter(
 )
 
 
-async def signal_separation_task(db: AsyncIOMotorClient, signal: Signal):
-    separate.delay(signal.dict())
-
-
 @router.get(
-    "/", response_model=List[SignalInResponse], status_code=status.HTTP_200_OK
+    "/",
+    response_model=List[SignalInResponse],
+    status_code=status.HTTP_200_OK,
+    name="get_signal",
 )
 async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
+    """Get all signals that were posted.
+    """
     signals = await read_signal(db)
     signals = list(map(lambda x: SignalInResponse(signal=x), signals))
     return signals
 
 
-@router.get("/stem/state/{signal_id}", response_model=SignalState)
+@router.get("/state/{signal_id}", response_model=SignalState)
 async def get_stem_state(
-    signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
+    signal_id: str = Path(..., title="Signal ID"),
+    db: AsyncIOMotorClient = Depends(get_database),
 ):
+    """Get state of the signal separation process
+    """
     signal_state = await get_signal_state(db, signal_id)
     if signal_state:
         return signal_state
@@ -70,9 +75,12 @@ async def get_stem_state(
 @router.websocket("/status/{signal_id}")
 async def get_stem_processing_status(
     websocket: WebSocket,
-    signal_id: str,
+    signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
 ):
+    """Open a WebSocket connection to receive
+    state updates of the background process.
+    """
     await websocket.accept()
 
     signal_state = await get_signal_state(db, signal_id)
@@ -87,18 +95,24 @@ async def get_stem_processing_status(
     await websocket.close()
 
 
-# @router.get("/state/")
+# @router.get("/state/{signal_id}")
 # async def get_state(
-#     request: Request, db: AsyncIOMotorClient = Depends(get_database)
+#     request: Request, signal_id: str,
+# db: AsyncIOMotorClient = Depends(get_database)
 # ):
-#     event_gen = watch_collection_field(db, sig)
-#     return EventSourceResponse(event_gen)
+#     def _filter(req):
+#         event_gen = watch_collection_field(db, sig, request=request)
+#     return EventSourceResponse(_filter())
 
 
 @router.get("/stem/{signal_id}/{stem}", status_code=status.HTTP_200_OK)
 async def get_stem(
-    signal_id: str, stem: str, db: AsyncIOMotorClient = Depends(get_database)
+    signal_id: str = Path(..., title="Signal ID"),
+    stem: str = Path(..., title="Stem name of separated signal"),
+    db: AsyncIOMotorClient = Depends(get_database),
 ):
+    """Get an individual separated signal stem.
+    """
     stem_file_id = get_stem_id(stem, signal_id)
     stream = await read_signal_file(db, stem_file_id)
     if not stream:
@@ -113,10 +127,15 @@ async def get_stem(
 )
 async def post_signal(
     background_task: BackgroundTasks,
-    signal_type: SignalType,
+    signal_type: SignalType = Path(..., title="Type of Signal"),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
 ):
+    """Post a signal to separate. Signal Type is used to
+    determine the separation process. Posting triggers a
+    background process which can be tracked by `/signal/state`
+    or `/signal/status`.
+    """
     # early validations for file extension / metadata based validation
     try:
         signal_metadata = process_signal(signal_file, signal_type)
@@ -127,14 +146,17 @@ async def post_signal(
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal)
-    background_task.add_task(signal_separation_task, db, signal_in_db)
+    separate.delay(signal_in_db.dict())
     return SignalInResponse(signal=signal_in_db)
 
 
 @router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)
 async def delete_signal(
-    signal_id: str, db: AsyncIOMotorClient = Depends(get_database)
+    signal_id: str = Path(..., title="Signal ID"),
+    db: AsyncIOMotorClient = Depends(get_database),
 ):
+    """Delete a signal.
+    """
     signal = await read_one_signal(db, signal_id)
     if not signal:
         raise HTTPException(status_code=404, detail="Signal does not exist")

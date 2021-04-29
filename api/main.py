@@ -1,13 +1,24 @@
 from fastapi import FastAPI
-from starlette.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import augment, signal
 from api.db import connect_to_mongo, close_mongo_connection
 
 
-# app = FastAPI(dependencies=[Depends(get_query_token)])
-api = FastAPI()
+tags_metadata = [
+    {
+        "name": "signal",
+        "description": (
+            "Signal can be an audio file. "
+            "On posting, background process will "
+            "initiate signal separation. "
+            "Depending upon the signal type different "
+            "separator can be used."
+        ),
+    }
+]
+
+api = FastAPI(openapi_tags=tags_metadata, title="Signal Separation API")
 origins = [
     "http://localhost:3000",
 ]
@@ -31,12 +42,6 @@ api.include_router(signal)
 @api.get("/")
 async def root():
     return {"message": "Hello Bigger Applications!"}
-
-
-@api.get("/sample/{file_name}")
-async def main(file_name: str):
-    response = FileResponse(f"static/{file_name}")
-    return response
 
 
 if __name__ == "__main__":

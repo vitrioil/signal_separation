@@ -7,6 +7,7 @@ RUN : \
     && add-apt-repository -y ppa:deadsnakes \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3.8-venv \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y libsndfile1-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && :
@@ -20,11 +21,11 @@ RUN pip install "poetry==$POETRY_VERSION"
 ENV POETRY_VIRTUALENVS_PATH=./
 
 #RUN poetry config virtualenvs.create false
-RUN poetry env use 3.8
-RUN poetry install --no-interaction
+#RUN poetry env use 3.8
+#RUN poetry install --no-interaction
 
 COPY . .
 
-RUN ls -lSht
-RUN ./*-py3.8/bin/activate
-CMD ["python", "-m", "uvicorn", "api.main:api", "--reload", "--host", "0.0.0.0"]
+#RUN ls -lSht
+#RUN ./*-py3.8/bin/activate
+#CMD ["python", "-m", "uvicorn", "api.main:api", "--reload", "--host", "0.0.0.0"]

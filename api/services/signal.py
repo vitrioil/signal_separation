@@ -32,6 +32,7 @@ async def read_one_signal(conn: AsyncIOMotorClient, signal_id: str):
         .get_collection(signal_collection_name)
         .find_one({"signal_id": signal_id})
     )
+    print(row, signal_id)
     if row:
         row = SignalInDB(**row)
     return row
@@ -173,22 +174,19 @@ async def get_signal_state(conn: AsyncIOMotorClient, signal_id: str):
         .get_collection(signal_state_collection_name)
         .find_one({"signal_id": signal_id})
     )
-    print(row)
     if row:
         signal_state = SignalState(**row)
         return signal_state
 
 
 async def update_signal_state(
-    conn: AsyncIOMotorClient, signal_id: str, state: str
+    conn: AsyncIOMotorClient, signal_state: SignalState
 ):
-    signal_state = SignalState(signal_id=signal_id, signal_state=state)
-    print(signal_state)
     row = (
         await conn.get_default_database()
         .get_collection(signal_state_collection_name)
         .update_one(
-            {"signal_id": signal_id},
+            {"signal_id": signal_state.signal_id},
             {"$set": {"signal_state": signal_state.signal_state}},
             upsert=True,
         )

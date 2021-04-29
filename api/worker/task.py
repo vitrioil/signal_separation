@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from api.db import get_database, connect_to_mongo
 from api.worker import app, TaskState
-from api.schemas import Signal, SeparatedSignal
+from api.schemas import Signal, SeparatedSignal, SignalState
 from api.utils.signal import split_audio
 from api.services import (
     create_stem,
@@ -26,7 +26,8 @@ async def _update_state(
     self, db: AsyncIOMotorClient, signal_id: str, state: TaskState
 ):
     self.update_state(state="PROGRESS", meta={"state": state})
-    await update_signal_state(db, signal_id, state)
+    signal_state = SignalState(signal_id=signal_id, signal_state=state)
+    await update_signal_state(db, signal_state)
 
 
 @app.task(bind=True)
@@ -44,7 +45,6 @@ async def _separate(self, signal: dict, stems: int):
     signal_id = signal.signal_id
 
     await _update_state(self, db, signal_id, TaskState.Start)
-    await asyncio.sleep(5)
 
     signal_type = signal.signal_metadata.signal_type
     separator = get_separator(signal_type, stems)
