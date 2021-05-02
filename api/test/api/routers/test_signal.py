@@ -1,9 +1,8 @@
-import pytest
-
-from pydub import AudioSegment
 import numpy as np
 
 from api.separator import Separator as ABCSeparator, SignalType
+from api.schemas import Signal
+from api.test.constants import TEST_SIGNAL_ID
 
 
 class TestSeparator(ABCSeparator):
@@ -22,27 +21,29 @@ def override_get_separator(signal_type: SignalType, stems: int = 2):
     }
 
 
-@pytest.fixture
-def signal_file(tmp_path):
-    sample_signal = AudioSegment.silent(duration=10000)
-    file_path = tmp_path / "signal.wav"
-    sample_signal.export(file_path.as_posix(), format="wav")
-    return file_path.as_posix()
+def test_get_signal(signal, client, cleanup_db):
+    response = client.get("/signal")
+
+    data = response.json()
+    assert response.status_code == 200
+    assert len(data) == 1
+    signal_actual = data[0]
+    assert signal_actual["signal"] == Signal(**signal.dict()).dict()
 
 
-@pytest.mark.asyncio
-async def test_get_signal(
-    signal, api, client, cleanup_db
-):
-    response = await client.get("/signal")
+def test_get_stem_state(signal_state, client, cleanup_db):
+    response = client.get(f"/signal/state/{TEST_SIGNAL_ID}")
 
     data = response.json()
     print(data)
     assert response.status_code == 200
-    assert len(data) == 1
-    signal_actual = data[0]
-    assert signal_actual.dict() == signal.dict()
+    signal_state_actual = data
+    assert signal_state_actual == signal_state.dict()
 
+    response = client.get("/signal/state/0")
+
+    data = response.json()
+    assert response.status_code == 404
 
 # def test_signal_music(signal, cleanup_db):
 #     stems = 2

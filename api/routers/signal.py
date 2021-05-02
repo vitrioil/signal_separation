@@ -59,7 +59,11 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
     return signals
 
 
-@router.get("/state/{signal_id}", response_model=SignalState)
+@router.get(
+    "/state/{signal_id}",
+    response_model=SignalState,
+    status_code=status.HTTP_200_OK,
+)
 async def get_stem_state(
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),

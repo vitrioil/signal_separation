@@ -2,7 +2,9 @@ import pytest
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from asgi_lifespan import LifespanManager
-from httpx import AsyncClient
+from fastapi import UploadFile
+from fastapi.testclient import TestClient
+from pydub import AudioSegment
 
 from api.db import db
 from api.db import get_database
@@ -13,19 +15,14 @@ from api.config import (
     signal_state_collection_name,
     grid_bucket_name,
 )
-from api.worker import TaskState
 from api.separator import SignalType
 from api.schemas import SignalInDB, SignalMetadata, SignalState
+from api.test.constants import TEST_SIGNAL_ID, TEST_SIGNAL_STATE, TEST_SIGNAL_FILE_NAME
 
 
-def _db_client():
+async def _db_client():
     db.client = AsyncIOMotorClient(MONGODB_TEST_URL)
     return db.client
-
-
-@pytest.fixture(scope="session")
-def db_client():
-    return _db_client()
 
 
 @pytest.yield_fixture(scope="session")
@@ -34,6 +31,11 @@ def event_loop(request):
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(scope="session")
+async def db_client(event_loop):
+    return await _db_client()
 
 
 # cleanup after running unit test
@@ -65,7 +67,7 @@ def _get_signal():
             signal_type=SignalType.Music,
             filename="test.wav",
         ),
-        signal_id="1",
+        signal_id=TEST_SIGNAL_ID,
     )
     return _signal
 
@@ -81,17 +83,40 @@ async def signal(db_client):
 
 @pytest.fixture
 async def signal_state(db_client):
-    signal_state = SignalState(signal_id="1", signal_state=TaskState.Saving)
+    signal_state = SignalState(
+        signal_id=TEST_SIGNAL_ID, signal_state=TEST_SIGNAL_STATE
+    )
     await db_client.get_default_database().get_collection(
         signal_state_collection_name
     ).insert_one(signal_state.dict())
     return signal_state
 
 
+@pytest.fixture
+def signal_file_name(tmp_path):
+    sample_signal = AudioSegment.silent(duration=10000)
+    file_path = tmp_path / TEST_SIGNAL_FILE_NAME
+    sample_signal.export(file_path.as_posix(), format="wav")
+    return file_path.as_posix()
+
+
+@pytest.fixture
+def signal_file(signal_file_name):
+    class Wrapper:
+        def __init__(self, obj, filename):
+            self.file = obj
+            self.filename = filename
+            self.content_type = "audio/mpeg"
+
+    with open(signal_file_name, 'rb') as f:
+        yield Wrapper(f, signal_file_name)
+
+
 @pytest.mark.asyncio
 @pytest.fixture
 async def api():
     from api.main import api as _api
+
     _api.dependency_overrides[get_database] = _db_client
 
     return _api
@@ -104,9 +129,10 @@ async def initialized_app(api):
 
 
 @pytest.fixture
-async def client(initialized_app, db_client):
-    async with AsyncClient(
-        app=initialized_app, base_url="http://testserver",
-        headers={"Content-Type": "application/json"},
-    ) as client:
-        yield client
+async def client(initialized_app):
+    # async with AsyncClient(
+    #     app=initialized_app, base_url="http://testserver",
+    #     headers={"Content-Type": "application/json"},
+    # ) as client:
+    #     yield client
+    return TestClient(initialized_app)
