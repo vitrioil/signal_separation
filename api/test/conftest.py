@@ -2,7 +2,6 @@ import pytest
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from asgi_lifespan import LifespanManager
-from fastapi import UploadFile
 from fastapi.testclient import TestClient
 from pydub import AudioSegment
 
@@ -17,7 +16,11 @@ from api.config import (
 )
 from api.separator import SignalType
 from api.schemas import SignalInDB, SignalMetadata, SignalState
-from api.test.constants import TEST_SIGNAL_ID, TEST_SIGNAL_STATE, TEST_SIGNAL_FILE_NAME
+from api.test.constants import (
+    TEST_SIGNAL_ID,
+    TEST_SIGNAL_STATE,
+    TEST_SIGNAL_FILE_NAME,
+)
 
 
 async def _db_client():
@@ -108,7 +111,7 @@ def signal_file(signal_file_name):
             self.filename = filename
             self.content_type = "audio/mpeg"
 
-    with open(signal_file_name, 'rb') as f:
+    with open(signal_file_name, "rb") as f:
         yield Wrapper(f, signal_file_name)
 
 

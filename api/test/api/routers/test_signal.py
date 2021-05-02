@@ -45,6 +45,7 @@ def test_get_stem_state(signal_state, client, cleanup_db):
     data = response.json()
     assert response.status_code == 404
 
+
 # def test_signal_music(signal, cleanup_db):
 #     stems = 2
 
