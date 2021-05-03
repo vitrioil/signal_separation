@@ -1,9 +1,6 @@
 import numpy as np
-from typing import Union
-
+from typing import Dict
 from spleeter.separator import Separator
-
-# from spleeter.audio.adapter import get_default_audio_adapter
 
 from api.separator import Separator as ABCSeparator
 
@@ -46,26 +43,22 @@ class SpleeterSeparator(ABCSeparator):
             print(len(chunk))
             yield chunk
 
-    def separate(self, audio: Union[str, np.ndarray], sample_rate=44_100):
+    def separate(
+        self, waveform: np.ndarray, sample_rate=44_100
+    ) -> Dict[str, np.ndarray]:
         """Separate audio into specified stems.
             Note: Spleeter uses tensorflow backend. Hence, corresponding
             installed device will automatically be used (CPU/GPU).
             Minimum VRAM/RAM requirement: 4GB (for small audio, <6 minutes).
             Args:
-                audio_file (str, array): path to the original signal or the signal itself.
+                audio_file (str, array): path to the original signal
+                                            or the signal itself.
                 sample_rate (int): sampling rate of the file.
             Returns:
                 signal (Signal): separated signals.
             Raises:
                 tf.errors.ResourceExhaustedError: When memory gets exhausted.
         """
-        if isinstance(audio, np.ndarray):
-            waveform = audio
-        else:
-            waveform, _ = self._audio_adapter.load(
-                audio, sample_rate=sample_rate
-            )
-
         print(waveform.shape)
         # predict in chunks
         prediction = {}

@@ -9,6 +9,7 @@ class TaskState(str, Enum):
     Separated: str = "Separated"
     Saving: str = "Saving"
     Complete: str = "Complete"
+    Deleted: str = "Deleted"
 
 
 app = Celery("worker", broker="pyamqp://guest@localhost//", backend="rpc://")

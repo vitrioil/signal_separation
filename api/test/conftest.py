@@ -20,6 +20,7 @@ from api.test.constants import (
     TEST_SIGNAL_ID,
     TEST_SIGNAL_STATE,
     TEST_SIGNAL_FILE_NAME,
+    TEST_DURATION_SECONDS,
 )
 
 
@@ -28,7 +29,7 @@ async def _db_client():
     return db.client
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def event_loop(request):
     """Create an instance of the default event loop for each test case."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
@@ -97,7 +98,7 @@ async def signal_state(db_client):
 
 @pytest.fixture
 def signal_file_name(tmp_path):
-    sample_signal = AudioSegment.silent(duration=10000)
+    sample_signal = AudioSegment.silent(duration=TEST_DURATION_SECONDS * 1000)
     file_path = tmp_path / TEST_SIGNAL_FILE_NAME
     sample_signal.export(file_path.as_posix(), format="wav")
     return file_path.as_posix()
@@ -139,3 +140,14 @@ async def client(initialized_app):
     # ) as client:
     #     yield client
     return TestClient(initialized_app)
+
+
+@pytest.fixture(scope="session")
+def celery_app():
+    from api.worker import app
+
+    app.conf.update(CELERY_ALWAYS_EAGER=True)
+    app.conf.update(broker="memory://")
+    app.conf.update(backend="cache+memory://")
+
+    return app

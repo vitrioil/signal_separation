@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Coroutine
 from fastapi.responses import StreamingResponse
 from fastapi import (
     # Request,
@@ -32,6 +32,7 @@ from api.services import (
     delete_signal_file,
     get_signal_state,
     watch_collection_field,
+    update_signal_state,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -51,7 +52,9 @@ router = APIRouter(
     status_code=status.HTTP_200_OK,
     name="get_signal",
 )
-async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
+async def get_signal(
+    db: AsyncIOMotorClient = Depends(get_database),
+) -> Coroutine[List[SignalInResponse], None, None]:
     """Get all signals that were posted.
     """
     signals = await read_signal(db)
@@ -67,13 +70,13 @@ async def get_signal(db: AsyncIOMotorClient = Depends(get_database)):
 async def get_stem_state(
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
-):
+) -> Coroutine[SignalState, None, None]:
     """Get state of the signal separation process
     """
     signal_state = await get_signal_state(db, signal_id)
-    if signal_state:
-        return signal_state
-    raise HTTPException(status_code=404, detail="Signal not found")
+    if not signal_state:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return signal_state
 
 
 @router.websocket("/status/{signal_id}")
@@ -114,7 +117,7 @@ async def get_stem(
     signal_id: str = Path(..., title="Signal ID"),
     stem: str = Path(..., title="Stem name of separated signal"),
     db: AsyncIOMotorClient = Depends(get_database),
-):
+) -> Coroutine[StreamingResponse, None, None]:
     """Get an individual separated signal stem.
     """
     stem_file_id = get_stem_id(stem, signal_id)
@@ -134,7 +137,7 @@ async def post_signal(
     signal_type: SignalType = Path(..., title="Type of Signal"),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
-):
+) -> Coroutine[SignalInResponse, None, None]:
     """Post a signal to separate. Signal Type is used to
     determine the separation process. Posting triggers a
     background process which can be tracked by `/signal/state`
@@ -145,7 +148,7 @@ async def post_signal(
         signal_metadata = process_signal(signal_file, signal_type)
     except Exception:
         raise HTTPException(
-            status_code=404, detail="Error while processing file"
+            status_code=400, detail="Error while processing file"
         )
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
@@ -158,21 +161,33 @@ async def post_signal(
 async def delete_signal(
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
-):
+) -> Coroutine[dict, None, None]:
     """Delete a signal.
     """
     signal = await read_one_signal(db, signal_id)
     if not signal:
-        raise HTTPException(status_code=404, detail="Signal does not exist")
+        raise HTTPException(status_code=404, detail="Signal not found")
 
     stem_ids = signal.separated_stem_id
 
     # Delete stem files and from collection
     for stem_id in stem_ids:
-        await delete_signal_file(db, stem_id)
+        try:
+            await delete_signal_file(db, stem_id)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Internal error")
         deleted = await remove_signal(db, stem_id, stem=True)
 
     # Delete signal file and from collection
-    await delete_signal_file(db, signal_id)
+    try:
+        await delete_signal_file(db, signal_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     deleted = await remove_signal(db, signal_id)
+    if deleted:
+        await update_signal_state(
+            db,
+            SignalState(signal_id=signal_id, signal_state=TaskState.Deleted),
+        )
     return {"signal_id": signal_id, "deleted": deleted}

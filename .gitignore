@@ -12,3 +12,4 @@ env/
 static/*mp3
 .idea/
 .vscode/
+.coverage

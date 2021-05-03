@@ -1,3 +1,4 @@
+from typing import Dict
 from pathlib import Path
 from tempfile import TemporaryFile
 
@@ -19,7 +20,7 @@ def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
     )
 
 
-def read_audio(stream: bytes, extension: str):
+def read_audio(stream: bytes, extension: str) -> np.ndarray:
     with TemporaryFile() as temp_file:
         temp_file.write(stream)
         temp_file.seek(0)
@@ -35,13 +36,15 @@ def split_audio(
     stream: bytes,
     extension: str,
     signal_type: SignalType,
-):
+) -> Dict[str, np.ndarray]:
     signal = read_audio(stream, extension)
     stems = separator.separate(signal)
     return stems
 
 
-def process_signal(signal_file: UploadFile, signal_type: SignalType):
+def process_signal(
+    signal_file: UploadFile, signal_type: SignalType
+) -> SignalMetadata:
     filename = signal_file.filename
     extension = Path(filename).suffix.replace(".", "")
     audio_segment = AudioSegment.from_file(signal_file.file)

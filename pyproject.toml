@@ -25,6 +25,7 @@ spleeter = "1.5.2"
 pylama = "^7.7.1"
 pytest-celery = "^0.0.0-alpha.1"
 asgi-lifespan = "^1.0.1"
+pytest-cov = "^2.11.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

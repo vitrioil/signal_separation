@@ -1,5 +1,5 @@
 #!/bin/bash
 
 export PYTHONPATH=$(pwd)
-poetry run pytest api/ -s
 poetry run black . --line-length 79
+poetry run pytest . --cov=. --cov-branch
