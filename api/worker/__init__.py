@@ -1,2 +1,2 @@
 from .main import app, TaskState
-from .task import separate
+from .task import separate, perform_separation

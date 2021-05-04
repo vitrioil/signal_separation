@@ -1,30 +1,32 @@
-# import pytest
+# # import numpy as np
+# # import pytest
+# from unittest.mock import patch
 
-# from api.schemas import Signal, SignalMetadata, SignalType
-# from api.worker import app, separate
-
-
-# @pytest.fixture(scope="module")
-# def celery_app(request):
-#     app.conf.update(CELERY_ALWAYS_EAGER=True)
+# # from api.separator import ABCSeparator
+# from api.worker import separate, perform_separation
 
 
-# @pytest.fixture
-# def signal():
-#     s = Signal(
-#         signal_id="1",
-#         signal_metadata=SignalMetadata(
-#             extension="wav",
-#             sample_rate=44_100,
-#             duration=10,
-#             channels=2,
-#             sample_width=2,
-#             signal_type=SignalType.Music,
-#             filename="test.wav",
-#         ),
-#     )
-#     return s.dict()
+# # class TestSeparator(ABCSeparator):
+# #     def __init__(self, stems: int):
+# #         self.stems = stems
+
+# #     def separate(self, audio: np.ndarray):
+# #         predictions = {f"{i}": audio.copy() for i in range(self.stems)}
+# #         return predictions
 
 
-# def test_separator_task(celery_app, signal, override_get_database):
-#     separate.delay(signal)
+# @patch("api.worker.task.perform_separation")
+# def test_separate(separate_mock):
+#     separate.apply(args=(None, None))
+#     assert separate_mock.called
+
+
+# # @pytest.mark.parametrize(
+# #     "stems",
+# #     (2, 3, 4)
+# # )
+# # def test_perform_separation(signal, stems):
+# #     with patch.object(
+# #         "api.worker.task", "get_separator", return_value=TestSeparator
+# #     ):
+# #         perform_separation(None, signal, stems)

@@ -33,10 +33,10 @@ async def _update_state(
 @app.task(bind=True)
 def separate(self, signal: dict, stems: int = 2):
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_separate(self, signal, stems))
+    return loop.run_until_complete(perform_separation(self, signal, stems))
 
 
-async def _separate(self, signal: dict, stems: int):
+async def perform_separation(self, signal: dict, stems: int):
     # TODO: separate out db dependency
     await connect_to_mongo()
     db = await get_database()

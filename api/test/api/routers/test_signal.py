@@ -1,7 +1,11 @@
 from tempfile import NamedTemporaryFile
 
 from api.schemas import Signal
-from api.test.constants import TEST_SIGNAL_ID, TEST_DURATION_SECONDS
+from api.test.constants import (
+    TEST_SIGNAL_ID,
+    TEST_DURATION_SECONDS,
+    TEST_STEMS,
+)
 
 
 def test_get_signal(signal, client, cleanup_db):
@@ -63,5 +67,17 @@ def test_delete_signal(signal, client, cleanup_db):
     assert response.status_code == 404
 
     response = client.delete(f"/signal/{TEST_SIGNAL_ID}")
-    data = response.json()
     assert response.status_code == 404
+
+
+def test_get_stem(generate_stem, client):
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/invalid")
+    assert response.status_code == 404
+
+    response = client.get(f"/signal/stem/Invalid/{TEST_STEMS[0]}")
+    assert response.status_code == 404
+
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
+    data = response.content
+    assert response.status_code == 200
+    assert data

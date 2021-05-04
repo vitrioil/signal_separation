@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import numpy as np
 from motor.motor_asyncio import AsyncIOMotorClient
 from asgi_lifespan import LifespanManager
 from fastapi.testclient import TestClient
@@ -21,6 +22,7 @@ from api.test.constants import (
     TEST_SIGNAL_STATE,
     TEST_SIGNAL_FILE_NAME,
     TEST_DURATION_SECONDS,
+    TEST_STEMS,
 )
 
 
@@ -116,6 +118,26 @@ def signal_file(signal_file_name):
         yield Wrapper(f, signal_file_name)
 
 
+@pytest.fixture
+async def generate_stem(signal, signal_file, db_client):
+    from api.services import save_stem_file, update_signal, get_stem_id
+
+    sr = 44_100
+    test_stem = np.zeros((sr * 10, 2))
+    separated_id = []
+    for stem_name in TEST_STEMS:
+        stem_id = get_stem_id(stem_name, signal.signal_id)
+        file_id = await save_stem_file(db_client, stem_id, test_stem, sr)
+        separated_id.append(file_id)
+
+    await update_signal(
+        db_client,
+        signal.signal_id,
+        separated_stems=TEST_STEMS,
+        separated_stem_id=separated_id,
+    )
+
+
 @pytest.mark.asyncio
 @pytest.fixture
 async def api():
@@ -142,7 +164,7 @@ async def client(initialized_app):
     return TestClient(initialized_app)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def celery_app():
     from api.worker import app
 
