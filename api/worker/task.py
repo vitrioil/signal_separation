@@ -36,10 +36,11 @@ def separate(self, signal: dict, stems: int = 2):
     return loop.run_until_complete(perform_separation(self, signal, stems))
 
 
-async def perform_separation(self, signal: dict, stems: int):
+async def perform_separation(self, signal: dict, stems: int, db=None):
     # TODO: separate out db dependency
-    await connect_to_mongo()
-    db = await get_database()
+    if db is None:
+        await connect_to_mongo()
+        db = await get_database()
 
     signal = Signal(**signal)
     signal_id = signal.signal_id

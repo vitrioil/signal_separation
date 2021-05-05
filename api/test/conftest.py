@@ -71,7 +71,7 @@ def _get_signal():
             channels=2,
             sample_width=2,
             signal_type=SignalType.Music,
-            filename="test.wav",
+            filename=TEST_SIGNAL_FILE_NAME,
         ),
         signal_id=TEST_SIGNAL_ID,
     )
