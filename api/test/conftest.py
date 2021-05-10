@@ -13,16 +13,26 @@ from api.config import (
     signal_collection_name,
     stem_collection_name,
     signal_state_collection_name,
+    user_collection_name,
     grid_bucket_name,
 )
 from api.separator import SignalType
-from api.schemas import SignalInDB, SignalMetadata, SignalState
+from api.schemas import (
+    SignalInDB,
+    SignalMetadata,
+    SignalState,
+    UserInCreate,
+    UserInDB,
+)
 from api.test.constants import (
     TEST_SIGNAL_ID,
     TEST_SIGNAL_STATE,
     TEST_SIGNAL_FILE_NAME,
     TEST_DURATION_SECONDS,
     TEST_STEMS,
+    TEST_EMAIL,
+    TEST_USERNAME,
+    TEST_PASSWORD,
 )
 
 
@@ -51,6 +61,7 @@ async def cleanup_db(db_client):
     db = db_client
     await db.get_default_database().drop_collection(stem_collection_name)
     await db.get_default_database().drop_collection(signal_collection_name)
+    await db.get_default_database().drop_collection(user_collection_name)
     await db.get_default_database().drop_collection(
         signal_state_collection_name
     )
@@ -136,6 +147,30 @@ async def generate_stem(signal, signal_file, db_client):
         separated_stems=TEST_STEMS,
         separated_stem_id=separated_id,
     )
+
+
+@pytest.fixture
+async def user():
+    user = UserInCreate(
+        username=TEST_USERNAME, email=TEST_EMAIL, password=TEST_PASSWORD
+    )
+    return user
+
+
+@pytest.fixture
+async def user_db(db_client, user):
+    from api.routers.authentication import get_password_hash
+
+    hashed_password = get_password_hash(user.password)
+    user_in_db = UserInDB(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+    )
+    await db_client.get_default_database().get_collection(
+        user_collection_name
+    ).insert_one(user_in_db.dict())
+    return user
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import augment, signal
+from api.routers import augment, signal, auth
 from api.db import connect_to_mongo, close_mongo_connection
 
 
@@ -36,6 +36,7 @@ api.add_event_handler("startup", connect_to_mongo)
 api.add_event_handler("shutdown", close_mongo_connection)
 
 api.include_router(augment)
+api.include_router(auth)
 api.include_router(signal)
 
 

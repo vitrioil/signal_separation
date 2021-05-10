@@ -20,6 +20,8 @@ celery = "^5.0.5"
 orjson = "^3.5.2"
 uvicorn = {version = "^0.13.4", extras = ["standard"]}
 spleeter = "1.5.2"
+passlib = {version = "^1.7.4", extras = ["bcrypt"]}
+python-jose = {version = "^3.2.0", extras = ["cryptography"]}
 
 [tool.poetry.dev-dependencies]
 pylama = "^7.7.1"

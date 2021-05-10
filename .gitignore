@@ -8,6 +8,7 @@ data/
 *pkl
 *swp
 *db
+!db/
 env/
 static/*mp3
 .idea/
