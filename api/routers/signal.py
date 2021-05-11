@@ -20,6 +20,7 @@ from api.schemas import (
     SignalInResponse,
     SignalInCreate,
     SignalState,
+    User,
 )
 from api.services import (
     create_signal,
@@ -36,6 +37,7 @@ from api.services import (
 )
 from api.separator import SignalType
 from api.db import get_database
+from api.dependencies import get_current_user
 from api.utils.signal import process_signal
 from api.worker import separate, TaskState
 
@@ -54,6 +56,7 @@ router = APIRouter(
 )
 async def get_signal(
     db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
 ) -> Coroutine[List[SignalInResponse], None, None]:
     """Get all signals that were posted.
     """
@@ -70,6 +73,7 @@ async def get_signal(
 async def get_stem_state(
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
 ) -> Coroutine[SignalState, None, None]:
     """Get state of the signal separation process
     """
@@ -84,6 +88,7 @@ async def get_stem_processing_status(
     websocket: WebSocket,
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
 ):
     """Open a WebSocket connection to receive
     state updates of the background process.
@@ -117,6 +122,7 @@ async def get_stem(
     signal_id: str = Path(..., title="Signal ID"),
     stem: str = Path(..., title="Stem name of separated signal"),
     db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
 ) -> Coroutine[StreamingResponse, None, None]:
     """Get an individual separated signal stem.
     """
@@ -137,6 +143,7 @@ async def post_signal(
     signal_type: SignalType = Path(..., title="Type of Signal"),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
 ) -> Coroutine[SignalInResponse, None, None]:
     """Post a signal to separate. Signal Type is used to
     determine the separation process. Posting triggers a
@@ -161,6 +168,7 @@ async def post_signal(
 async def delete_signal(
     signal_id: str = Path(..., title="Signal ID"),
     db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
 ) -> Coroutine[dict, None, None]:
     """Delete a signal.
     """

@@ -9,9 +9,10 @@ from api.test.constants import (
 
 
 def test_get_signal(signal, client, cleanup_db):
-    response = client.get("/signal")
+    response = client.get("/signal", headers={"Authorization": "Bearer test"})
 
     data = response.json()
+    print(data)
     assert response.status_code == 200
     assert len(data) == 1
     signal_actual = data[0]

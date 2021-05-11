@@ -1,6 +1,5 @@
 import pytest
 
-from api.schemas import UserInCreate
 from api.services import create_user, get_user
 
 

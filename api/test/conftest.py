@@ -6,8 +6,8 @@ from asgi_lifespan import LifespanManager
 from fastapi.testclient import TestClient
 from pydub import AudioSegment
 
-from api.db import db
-from api.db import get_database
+from api.db import db, get_database
+from api.dependencies import get_current_user
 from api.config import (
     MONGODB_TEST_URL,
     signal_collection_name,
@@ -149,12 +149,16 @@ async def generate_stem(signal, signal_file, db_client):
     )
 
 
-@pytest.fixture
-async def user():
+def _user():
     user = UserInCreate(
         username=TEST_USERNAME, email=TEST_EMAIL, password=TEST_PASSWORD
     )
     return user
+
+
+@pytest.fixture
+async def user():
+    return _user()
 
 
 @pytest.fixture
@@ -173,12 +177,17 @@ async def user_db(db_client, user):
     return user
 
 
+def get_test_current_user():
+    return _user()
+
+
 @pytest.mark.asyncio
 @pytest.fixture
 async def api():
     from api.main import api as _api
 
     _api.dependency_overrides[get_database] = _db_client
+    _api.dependency_overrides[get_current_user] = get_test_current_user
 
     return _api
 

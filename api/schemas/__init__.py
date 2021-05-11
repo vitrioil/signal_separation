@@ -10,7 +10,7 @@ from .signal import (
     SignalState,
     SignalStateInDB,
 )
-from .authentication import Token
+from .authentication import Token, TokenData
 from .user import (
     User,
     UserInCreate,

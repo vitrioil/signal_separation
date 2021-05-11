@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 
 from fastapi import Depends, APIRouter, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
 from passlib.context import CryptContext
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,7 +12,6 @@ from api.schemas import Token, UserInCreate, User, UserInResponse
 from api.config import SIGN_ALGORITHM, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 router = APIRouter(tags=["auth"],)
 
 
@@ -57,7 +56,7 @@ async def register_user(
             detail="User already exists",
         )
     user = User(**user.dict())
-    access_token = create_access_token({"username": user.username})
+    access_token = create_access_token({"sub": user.username})
     token = Token(access_token=access_token, token_type="bearer")
     return UserInResponse(user=user, token=token)
 
@@ -77,6 +76,6 @@ async def login_for_access_token(
     password = form_data.password
     if not await authenticate_user(db, username, password):
         raise exception
-    access_token = create_access_token({"username": username})
+    access_token = create_access_token({"sub": username})
     token = Token(access_token=access_token, token_type="bearer")
     return token
