@@ -13,5 +13,6 @@ from .signal import (
     get_signal_state,
     update_signal_state,
     watch_collection_field,
+    validate_user_signal,
 )
 from .user import create_user, get_user

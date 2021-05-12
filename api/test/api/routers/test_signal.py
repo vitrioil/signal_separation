@@ -1,6 +1,6 @@
 from tempfile import NamedTemporaryFile
 
-from api.schemas import Signal
+from api.schemas import Signal, SignalState
 from api.test.constants import (
     TEST_SIGNAL_ID,
     TEST_DURATION_SECONDS,
@@ -9,7 +9,7 @@ from api.test.constants import (
 
 
 def test_get_signal(signal, client, cleanup_db):
-    response = client.get("/signal", headers={"Authorization": "Bearer test"})
+    response = client.get("/signal")
 
     data = response.json()
     print(data)
@@ -25,7 +25,7 @@ def test_get_stem_state(signal_state, client, cleanup_db):
     data = response.json()
     assert response.status_code == 200
     signal_state_actual = data
-    assert signal_state_actual == signal_state.dict()
+    assert signal_state_actual == SignalState(**signal_state.dict()).dict()
 
     response = client.get("/signal/state/0")
 

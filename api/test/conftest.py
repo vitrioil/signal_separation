@@ -1,3 +1,4 @@
+from api.schemas.signal import SignalStateInDB
 import pytest
 import asyncio
 import numpy as np
@@ -20,7 +21,6 @@ from api.separator import SignalType
 from api.schemas import (
     SignalInDB,
     SignalMetadata,
-    SignalState,
     UserInCreate,
     UserInDB,
 )
@@ -85,6 +85,7 @@ def _get_signal():
             filename=TEST_SIGNAL_FILE_NAME,
         ),
         signal_id=TEST_SIGNAL_ID,
+        username=TEST_USERNAME,
     )
     return _signal
 
@@ -100,8 +101,10 @@ async def signal(db_client):
 
 @pytest.fixture
 async def signal_state(db_client):
-    signal_state = SignalState(
-        signal_id=TEST_SIGNAL_ID, signal_state=TEST_SIGNAL_STATE
+    signal_state = SignalStateInDB(
+        signal_id=TEST_SIGNAL_ID,
+        signal_state=TEST_SIGNAL_STATE,
+        username=TEST_USERNAME,
     )
     await db_client.get_default_database().get_collection(
         signal_state_collection_name
@@ -144,6 +147,7 @@ async def generate_stem(signal, signal_file, db_client):
     await update_signal(
         db_client,
         signal.signal_id,
+        TEST_USERNAME,
         separated_stems=TEST_STEMS,
         separated_stem_id=separated_id,
     )

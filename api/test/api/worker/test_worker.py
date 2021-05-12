@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from unittest.mock import patch
 
-from constants import TEST_SIGNAL_FILE_NAME
+from api.test.constants import TEST_SIGNAL_FILE_NAME, TEST_USERNAME
 from api.services import read_one_signal
 from api.separator import Separator as ABCSeparator
 
@@ -63,6 +63,7 @@ def test_separate(separate_mock):
 async def test_perform_separation(
     db_client,
     client,
+    user,
     signal_celery_setup,
     stems,
     celery_state_update_mock,
@@ -72,9 +73,13 @@ async def test_perform_separation(
     from api.worker import perform_separation
 
     await perform_separation(
-        celery_state_update_mock, signal_celery_setup, stems, db_client
+        celery_state_update_mock,
+        signal_celery_setup,
+        user.dict(),
+        stems,
+        db_client,
     )
     signal_actual = await read_one_signal(
-        db_client, signal_celery_setup["signal_id"]
+        db_client, signal_celery_setup["signal_id"], TEST_USERNAME
     )
     assert len(signal_actual.separated_stems) == stems

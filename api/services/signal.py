@@ -29,12 +29,12 @@ def get_stem_id(stem_name: str, signal_id: str) -> str:
 
 
 async def read_one_signal(
-    conn: AsyncIOMotorClient, signal_id: str
+    conn: AsyncIOMotorClient, signal_id: str, username: str
 ) -> Coroutine[SignalInDB, None, None]:
     row = (
         await conn.get_default_database()
         .get_collection(signal_collection_name)
-        .find_one({"signal_id": signal_id})
+        .find_one({"signal_id": signal_id, "username": username})
     )
     if row:
         row = SignalInDB(**row)
@@ -42,12 +42,12 @@ async def read_one_signal(
 
 
 async def read_signal(
-    conn: AsyncIOMotorClient, length: int = 20
+    conn: AsyncIOMotorClient, username: str, length: int = 20
 ) -> Coroutine[List[SignalInDB], None, None]:
     rows = (
         await conn.get_default_database()
         .get_collection(signal_collection_name)
-        .find()
+        .find({"username": username})
         .to_list(length=length)
     )
     rows = list(map(lambda x: SignalInDB(**x), rows))
@@ -55,13 +55,13 @@ async def read_signal(
 
 
 async def create_signal(
-    conn: AsyncIOMotorClient, signal: Signal
+    conn: AsyncIOMotorClient, signal: Signal, username: str
 ) -> Coroutine[SignalInDB, None, None]:
-    signal_in_db = SignalInDB(**signal.dict())
+    signal_in_db = SignalInDB(**signal.dict(), username=username)
     row = (
         await conn.get_default_database()
         .get_collection(signal_collection_name)
-        .insert_one(signal.dict())
+        .insert_one(signal_in_db.dict())
     )
 
     signal_in_db.id = str(row.inserted_id)
@@ -72,9 +72,9 @@ async def create_signal(
 
 
 async def update_signal(
-    conn: AsyncIOMotorClient, signal_id: str, **update_kwargs
+    conn: AsyncIOMotorClient, signal_id: str, username: str, **update_kwargs
 ) -> Coroutine[SignalInDB, None, None]:
-    signal = await read_one_signal(conn, signal_id)
+    signal = await read_one_signal(conn, signal_id, username)
 
     signal = signal.dict()
     signal = SignalInDB(**{**signal, **update_kwargs})
@@ -86,7 +86,7 @@ async def update_signal(
 
 
 async def remove_signal(
-    conn: AsyncIOMotorClient, signal_id: str, stem=False
+    conn: AsyncIOMotorClient, signal_id: str, username: str, stem=False
 ) -> Coroutine[bool, None, None]:
     collection_name = signal_collection_name
     if stem:
@@ -94,15 +94,15 @@ async def remove_signal(
     rows = (
         await conn.get_default_database()
         .get_collection(collection_name)
-        .delete_one({"signal_id": signal_id})
+        .delete_one({"signal_id": signal_id, "username": username})
     )
     return rows.deleted_count == 1
 
 
 async def create_stem(
-    conn: AsyncIOMotorClient, signal: SeparatedSignal
+    conn: AsyncIOMotorClient, signal: SeparatedSignal, username: str
 ) -> Coroutine[SignalInDB, None, None]:
-    signal_in_db = SeparatedSignalInDB(**signal.dict())
+    signal_in_db = SeparatedSignalInDB(**signal.dict(), username=username)
     row = (
         await conn.get_default_database()
         .get_collection(stem_collection_name)
@@ -114,6 +114,19 @@ async def create_stem(
     signal_in_db.updated_at = ObjectId(signal_in_db.id).generation_time
 
     return signal_in_db
+
+
+async def validate_user_signal(
+    conn: AsyncIOMotorClient, signal_id: str, username: str
+) -> bool:
+    row = (
+        await conn.get_default_database()
+        .get_collection(signal_collection_name)
+        .find_one({"signal_id": signal_id, "username": username})
+    )
+    if row:
+        return True
+    return False
 
 
 async def save_signal_file(
@@ -186,12 +199,12 @@ async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
 
 
 async def get_signal_state(
-    conn: AsyncIOMotorClient, signal_id: str
+    conn: AsyncIOMotorClient, signal_id: str, username: str
 ) -> Coroutine[SignalState, None, None]:
     row = (
         await conn.get_default_database()
         .get_collection(signal_state_collection_name)
-        .find_one({"signal_id": signal_id})
+        .find_one({"signal_id": signal_id, "username": username})
     )
     if row:
         signal_state = SignalState(**row)
@@ -199,13 +212,13 @@ async def get_signal_state(
 
 
 async def update_signal_state(
-    conn: AsyncIOMotorClient, signal_state: SignalState
+    conn: AsyncIOMotorClient, signal_state: SignalState, username: str
 ) -> Coroutine[SignalState, None, None]:
     row = (
         await conn.get_default_database()
         .get_collection(signal_state_collection_name)
         .update_one(
-            {"signal_id": signal_state.signal_id},
+            {"signal_id": signal_state.signal_id, "username": username},
             {"$set": {"signal_state": signal_state.signal_state}},
             upsert=True,
         )

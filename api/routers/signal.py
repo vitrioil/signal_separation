@@ -8,7 +8,6 @@ from fastapi import (
     UploadFile,
     File,
     Depends,
-    BackgroundTasks,
     status,
     WebSocket,
 )
@@ -34,6 +33,7 @@ from api.services import (
     get_signal_state,
     watch_collection_field,
     update_signal_state,
+    validate_user_signal,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -60,7 +60,7 @@ async def get_signal(
 ) -> Coroutine[List[SignalInResponse], None, None]:
     """Get all signals that were posted.
     """
-    signals = await read_signal(db)
+    signals = await read_signal(db, user.username)
     signals = list(map(lambda x: SignalInResponse(signal=x), signals))
     return signals
 
@@ -77,7 +77,7 @@ async def get_stem_state(
 ) -> Coroutine[SignalState, None, None]:
     """Get state of the signal separation process
     """
-    signal_state = await get_signal_state(db, signal_id)
+    signal_state = await get_signal_state(db, signal_id, user.username)
     if not signal_state:
         raise HTTPException(status_code=404, detail="Signal not found")
     return signal_state
@@ -95,8 +95,12 @@ async def get_stem_processing_status(
     """
     await websocket.accept()
 
-    signal_state = await get_signal_state(db, signal_id)
-    if signal_state and signal_state.signal_state == TaskState.Complete:
+    signal_state = await get_signal_state(db, signal_id, "user1")
+    if not signal_state:
+        await websocket.send_text("Signal not found")
+        await websocket.close()
+        return
+    elif signal_state.signal_state == TaskState.Complete:
         await websocket.send_text(signal_state.signal_state)
         await websocket.close()
         return
@@ -126,10 +130,13 @@ async def get_stem(
 ) -> Coroutine[StreamingResponse, None, None]:
     """Get an individual separated signal stem.
     """
+    exception = HTTPException(status_code=404, detail="Stem not found")
+    if not await validate_user_signal(db, signal_id, user.username):
+        raise exception
     stem_file_id = get_stem_id(stem, signal_id)
     stream = await read_signal_file(db, stem_file_id)
     if not stream:
-        raise HTTPException(status_code=404, detail="Stem not found")
+        raise exception
     return StreamingResponse(stream, media_type="audio/mpeg")
 
 
@@ -139,7 +146,6 @@ async def get_stem(
     status_code=status.HTTP_201_CREATED,
 )
 async def post_signal(
-    background_task: BackgroundTasks,
     signal_type: SignalType = Path(..., title="Type of Signal"),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
@@ -159,8 +165,8 @@ async def post_signal(
         )
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
-    signal_in_db = await create_signal(db, signal)
-    separate.delay(signal_in_db.dict())
+    signal_in_db = await create_signal(db, signal, user.username)
+    separate.delay(signal_in_db.dict(), user.dict())
     return SignalInResponse(signal=signal_in_db)
 
 
@@ -172,7 +178,7 @@ async def delete_signal(
 ) -> Coroutine[dict, None, None]:
     """Delete a signal.
     """
-    signal = await read_one_signal(db, signal_id)
+    signal = await read_one_signal(db, signal_id, user.username)
     if not signal:
         raise HTTPException(status_code=404, detail="Signal not found")
 
@@ -184,7 +190,7 @@ async def delete_signal(
             await delete_signal_file(db, stem_id)
         except Exception:
             raise HTTPException(status_code=500, detail="Internal error")
-        deleted = await remove_signal(db, stem_id, stem=True)
+        deleted = await remove_signal(db, stem_id, user.username, stem=True)
 
     # Delete signal file and from collection
     try:
@@ -192,10 +198,11 @@ async def delete_signal(
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    deleted = await remove_signal(db, signal_id)
+    deleted = await remove_signal(db, signal_id, user.username)
     if deleted:
         await update_signal_state(
             db,
             SignalState(signal_id=signal_id, signal_state=TaskState.Deleted),
+            user.username,
         )
     return {"signal_id": signal_id, "deleted": deleted}

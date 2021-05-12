@@ -44,6 +44,7 @@ class SignalInCreate(Signal):
 
 class SignalInDB(DBModelMixin, Signal):
     separated_stem_id: List[str] = Field([], description="Signal ID of Stems")
+    username: str = Field(..., description="Username who owns the signal")
 
 
 class SignalInResponse(BaseModel):
@@ -57,7 +58,7 @@ class SeparatedSignal(SignalBase):
 
 
 class SeparatedSignalInDB(DBModelMixin, SeparatedSignal):
-    pass
+    username: str = Field(..., description="Username who owns the signal")
 
 
 class SignalState(BaseModel):
@@ -66,4 +67,4 @@ class SignalState(BaseModel):
 
 
 class SignalStateInDB(DBModelMixin, SignalState):
-    pass
+    username: str = Field(..., description="Username who owns the signal")

@@ -19,67 +19,107 @@ from api.services import (
     save_stem_file,
 )
 from api.test.conftest import _get_signal
+from api.test.constants import TEST_USERNAME
+from api.schemas import Signal, SignalState
 
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_read_one_signal(signal, db_client, cleanup_db):
-    signal_actual = await read_one_signal(db_client, signal.signal_id)
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, TEST_USERNAME
+    )
     assert signal.signal_id == signal_actual.signal_id
 
-    signal_actual = await read_one_signal(db_client, "99")
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, "invalid"
+    )
+    assert not signal_actual
+
+    signal_actual = await read_one_signal(db_client, "99", TEST_USERNAME)
     assert not signal_actual
 
 
 async def test_create_signal(db_client, cleanup_db):
-    signal = _get_signal()
-    await create_signal(db_client, signal)
+    signal = Signal(**_get_signal().dict())
+    await create_signal(db_client, signal, TEST_USERNAME)
 
-    signal_actual = await read_one_signal(db_client, signal.signal_id)
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, TEST_USERNAME
+    )
     assert signal.signal_id == signal_actual.signal_id
+
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, "invalid"
+    )
+    assert not signal_actual
 
 
 async def test_update_signal(signal, db_client, cleanup_db):
     update_fields = {"separated_stems": ["one", "two"]}
-    await update_signal(db_client, signal.signal_id, **update_fields)
+    await update_signal(
+        db_client, signal.signal_id, TEST_USERNAME, **update_fields
+    )
 
-    signal_actual = await read_one_signal(db_client, signal.signal_id)
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, TEST_USERNAME
+    )
     assert signal_actual.separated_stems == update_fields["separated_stems"]
 
-    signal_actual = await read_one_signal(db_client, "99")
+    signal_actual = await read_one_signal(
+        db_client, signal.signal_id, "invalid"
+    )
+    assert not signal_actual
+
+    signal_actual = await read_one_signal(db_client, "99", TEST_USERNAME)
     assert not signal_actual
 
 
 async def test_read_all_signals(db_client, cleanup_db):
-    signal = _get_signal()
-    await create_signal(db_client, signal)
+    signal = Signal(**_get_signal().dict())
+    await create_signal(db_client, signal, TEST_USERNAME)
 
     signal.signal_id = "2"
-    await create_signal(db_client, signal)
+    await create_signal(db_client, signal, TEST_USERNAME)
 
-    signals = await read_signal(db_client)
+    signals = await read_signal(db_client, TEST_USERNAME)
     assert len(signals) == 2
+
+    signals = await read_signal(db_client, "invalid")
+    assert not signals
 
 
 async def test_delete_signal(signal, db_client, cleanup_db):
-    deleted_count = await remove_signal(db_client, signal.signal_id)
+    deleted_count = await remove_signal(db_client, signal.signal_id, "invalid")
+    assert not deleted_count
+
+    deleted_count = await remove_signal(db_client, signal.signal_id, TEST_USERNAME)
     assert deleted_count == 1
 
-    deleted_count = await remove_signal(db_client, signal.signal_id)
+    deleted_count = await remove_signal(db_client, signal.signal_id, TEST_USERNAME)
     assert not deleted_count
 
 
 async def test_get_signal_state(signal_state, db_client, cleanup_db):
     signal_state_actual = await get_signal_state(
-        db_client, signal_state.signal_id
+        db_client, signal_state.signal_id, TEST_USERNAME
     )
-    assert signal_state_actual == signal_state
+    assert signal_state_actual == SignalState(**signal_state.dict())
+
+    signal_state_actual = await get_signal_state(
+        db_client, signal_state.signal_id, "invalid"
+    )
+    assert not signal_state_actual
 
 
 async def test_update_signal_state(signal_state, db_client, cleanup_db):
     signal_state.signal_state = TaskState.Complete
-    signal_state_updated = await update_signal_state(db_client, signal_state)
+    signal_state_updated = await update_signal_state(db_client, signal_state, TEST_USERNAME)
+    assert signal_state_updated.signal_state == TaskState.Complete
+
+    # upsert will insert
+    signal_state_updated = await update_signal_state(db_client, signal_state, "invalid")
     assert signal_state_updated.signal_state == TaskState.Complete
 
 
