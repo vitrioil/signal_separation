@@ -63,6 +63,26 @@ def test_post_signal(signal_file_name, client, celery_app, cleanup_db):
     assert response.status_code == 400
 
 
+def test_patch_signal(signal, signal_file_name, client, cleanup_db):
+    stem_name = "new_stem"
+    response = client.patch(
+        "/signal/Music",
+        params={"signal_id": TEST_SIGNAL_ID, "stem_name": stem_name},
+        files={
+            "signal_file": (
+                "filename",
+                open(signal_file_name, "rb"),
+                "audio/mpeg",
+            )
+        },
+    )
+    data = response.json()
+    print(data)
+    assert response.status_code == 202
+    assert data["signal"]["signal_id"] == TEST_SIGNAL_ID
+    assert data["signal"]["separated_stems"][-1] == stem_name
+
+
 def test_delete_signal(signal, client, cleanup_db):
     response = client.delete("/signal/0")
     assert response.status_code == 404

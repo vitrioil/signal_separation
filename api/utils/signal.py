@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Tuple
 from pathlib import Path
 from tempfile import TemporaryFile
 
@@ -10,14 +10,12 @@ from api.schemas import SignalMetadata
 from api.separator import Separator, SignalType
 
 
-def pydub_to_np(audio: AudioSegment) -> (np.ndarray, int):
-    return (
-        np.array(audio.get_array_of_samples(), dtype=np.float32)
-        .reshape((-1, audio.channels))
-        .T
-        / (1 << (8 * audio.sample_width)),
-        audio.frame_rate,
-    )
+def pydub_to_np(audio: AudioSegment) -> Tuple[np.ndarray, int]:
+    array = np.array(audio.get_array_of_samples(), dtype=np.float32).reshape(
+        (-1, audio.channels)
+    ).T / (1 << (8 * audio.sample_width))
+    signal = np.transpose(array, (1, 0))
+    return signal
 
 
 def read_audio(stream: bytes, extension: str) -> np.ndarray:
@@ -26,8 +24,7 @@ def read_audio(stream: bytes, extension: str) -> np.ndarray:
         temp_file.seek(0)
         signal = AudioSegment.from_file(temp_file)
 
-    signal, _ = pydub_to_np(signal)
-    signal = np.transpose(signal, (1, 0))
+    signal = pydub_to_np(signal)
     return signal
 
 
@@ -43,11 +40,12 @@ def split_audio(
 
 
 def process_signal(
-    signal_file: UploadFile, signal_type: SignalType
+    signal_file: UploadFile,
+    signal_type: SignalType,
+    segment=False,
+    array=False,
 ) -> SignalMetadata:
-    filename = signal_file.filename
-    extension = Path(filename).suffix.replace(".", "")
-    audio_segment = AudioSegment.from_file(signal_file.file)
+    filename, extension, audio_segment = file_to_segment(signal_file)
 
     signal_metadata = SignalMetadata(
         extension=extension,
@@ -58,4 +56,15 @@ def process_signal(
         signal_type=signal_type,
         filename=filename,
     )
+    if segment:
+        return signal_metadata, audio_segment
+    if array:
+        return signal_metadata, pydub_to_np(audio_segment)
     return signal_metadata
+
+
+def file_to_segment(signal_file: UploadFile):
+    filename = signal_file.filename
+    extension = Path(filename).suffix.replace(".", "")
+    audio_segment = AudioSegment.from_file(signal_file.file)
+    return filename, extension, audio_segment

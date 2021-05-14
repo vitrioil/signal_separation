@@ -1,3 +1,4 @@
+from inspect import CO_ASYNC_GENERATOR
 from typing import List, Coroutine
 from fastapi.responses import StreamingResponse
 from fastapi import (
@@ -9,16 +10,18 @@ from fastapi import (
     File,
     Depends,
     status,
-    WebSocket,
+    # WebSocket,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # from sse_starlette.sse import EventSourceResponse
 
 from api.schemas import (
+    Signal,
     SignalInResponse,
     SignalInCreate,
     SignalState,
+    SeparatedSignal,
     User,
 )
 from api.services import (
@@ -31,9 +34,12 @@ from api.services import (
     read_one_signal,
     delete_signal_file,
     get_signal_state,
-    watch_collection_field,
+    # watch_collection_field,
     update_signal_state,
     validate_user_signal,
+    create_stem,
+    update_signal,
+    save_stem_file,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -83,32 +89,32 @@ async def get_stem_state(
     return signal_state
 
 
-@router.websocket("/status/{signal_id}")
-async def get_stem_processing_status(
-    websocket: WebSocket,
-    signal_id: str = Path(..., title="Signal ID"),
-    db: AsyncIOMotorClient = Depends(get_database),
-    user: User = Depends(get_current_user),
-):
-    """Open a WebSocket connection to receive
-    state updates of the background process.
-    """
-    await websocket.accept()
+# @router.websocket("/status/{signal_id}")
+# async def get_stem_processing_status(
+#     websocket: WebSocket,
+#     signal_id: str = Path(..., title="Signal ID"),
+#     db: AsyncIOMotorClient = Depends(get_database),
+#     user: User = Depends(get_current_user),
+# ):
+#     """Open a WebSocket connection to receive
+#     state updates of the background process.
+#     """
+#     await websocket.accept()
 
-    signal_state = await get_signal_state(db, signal_id, "user1")
-    if not signal_state:
-        await websocket.send_text("Signal not found")
-        await websocket.close()
-        return
-    elif signal_state.signal_state == TaskState.Complete:
-        await websocket.send_text(signal_state.signal_state)
-        await websocket.close()
-        return
+#     signal_state = await get_signal_state(db, signal_id, "user1")
+#     if not signal_state:
+#         await websocket.send_text("Signal not found")
+#         await websocket.close()
+#         return
+#     elif signal_state.signal_state == TaskState.Complete:
+#         await websocket.send_text(signal_state.signal_state)
+#         await websocket.close()
+#         return
 
-    async for stream in watch_collection_field(db, signal_id):
-        state = stream["signal_state"]
-        await websocket.send_text(state)
-    await websocket.close()
+#     async for stream in watch_collection_field(db, signal_id):
+#         state = stream["signal_state"]
+#         await websocket.send_text(state)
+#     await websocket.close()
 
 
 # @router.get("/state/{signal_id}")
@@ -168,6 +174,85 @@ async def post_signal(
     signal_in_db = await create_signal(db, signal, user.username)
     separate.delay(signal_in_db.dict(), user.dict())
     return SignalInResponse(signal=signal_in_db)
+
+
+@router.patch(
+    "/{signal_type}",
+    response_model=SignalInResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def patch_signal(
+    signal_id: str = Path(..., title="Signal ID"),
+    stem_name: str = Path(..., title="Stem name"),
+    signal_type: SignalType = Path(..., title="Type of Signal"),
+    db: AsyncIOMotorClient = Depends(get_database),
+    signal_file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+) -> Coroutine[SignalInResponse, None, None]:
+    """Patch a stem to a signal. Add a stem to a separated signal.
+    """
+
+    # validate
+    exception = HTTPException(status_code=404, detail="Signal not found")
+    if not await validate_user_signal(db, signal_id, user.username):
+        raise exception
+
+    try:
+        # saving stem file requires array for consistency
+        signal_metadata, signal = process_signal(
+            signal_file, signal_type, array=True
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail="Error while processing file"
+        )
+
+    stem_file_id = get_stem_id(stem_name, signal_id)
+    stem_id = await save_stem_file(
+        db, stem_file_id, signal, signal_metadata.sample_rate
+    )
+    stem = SeparatedSignal(
+        signal_id=stem_id,
+        signal_metadata=signal_metadata,
+        stem_name=stem_name,
+    )
+    await create_stem(db, stem, user.username)
+
+    # add stem reference to original signal
+    signal = await read_one_signal(db, signal_id, user.username)
+    parent_signal = await update_signal(
+        db,
+        signal.signal_id,
+        user.username,
+        separated_stems=[*signal.separated_stems, stem_name],
+        separated_stem_id=[*signal.separated_stem_id, stem_id],
+    )
+    return SignalInResponse(signal=Signal(**parent_signal.dict()))
+
+
+# @router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)
+# async def delete_stem(
+#     stem_name: str = Path(..., title="Stem name"),
+#     signal_id: str = Path(..., title="Signal ID"),
+#     db: AsyncIOMotorClient = Depends(get_database),
+#     user: User = Depends(get_current_user),
+# ) -> Coroutine[dict, None, None]:
+#     """Delete stem of a signal.
+#     """
+#     signal = await read_one_signal(db, signal_id, user.username)
+#     if not signal:
+#         raise HTTPException(status_code=404, detail="Signal not found")
+
+#     try:
+#         stem_index = signal.separated_stems.index(stem_name)
+#     except ValueError:
+#         raise HTTPException(status_code=404, detail="Stem not found")
+#     stem_id = signal.separated_stem_id[stem_index]
+#     try:
+#         await delete_signal_file(db, stem_id)
+#     except Exception:
+#         raise HTTPException(status_code=500, detail="Internal error")
+#     deleted = await remove_signal(db, stem_id, user.username, stem=True)
 
 
 @router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)

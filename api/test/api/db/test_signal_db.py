@@ -94,10 +94,14 @@ async def test_delete_signal(signal, db_client, cleanup_db):
     deleted_count = await remove_signal(db_client, signal.signal_id, "invalid")
     assert not deleted_count
 
-    deleted_count = await remove_signal(db_client, signal.signal_id, TEST_USERNAME)
+    deleted_count = await remove_signal(
+        db_client, signal.signal_id, TEST_USERNAME
+    )
     assert deleted_count == 1
 
-    deleted_count = await remove_signal(db_client, signal.signal_id, TEST_USERNAME)
+    deleted_count = await remove_signal(
+        db_client, signal.signal_id, TEST_USERNAME
+    )
     assert not deleted_count
 
 
@@ -115,11 +119,15 @@ async def test_get_signal_state(signal_state, db_client, cleanup_db):
 
 async def test_update_signal_state(signal_state, db_client, cleanup_db):
     signal_state.signal_state = TaskState.Complete
-    signal_state_updated = await update_signal_state(db_client, signal_state, TEST_USERNAME)
+    signal_state_updated = await update_signal_state(
+        db_client, signal_state, TEST_USERNAME
+    )
     assert signal_state_updated.signal_state == TaskState.Complete
 
     # upsert will insert
-    signal_state_updated = await update_signal_state(db_client, signal_state, "invalid")
+    signal_state_updated = await update_signal_state(
+        db_client, signal_state, "invalid"
+    )
     assert signal_state_updated.signal_state == TaskState.Complete
 
 

@@ -1,18 +1,11 @@
+from typing import Coroutine, List
 from fastapi import APIRouter
+
+from api.schemas.augment import AugmentType
 
 router = APIRouter(prefix="/augment", tags=["augment"])
 
 
 @router.get("/")
-async def read_augment():
-    return [{"username": "Rick"}, {"username": "Morty"}]
-
-
-@router.get("/me")
-async def read_augment_me():
-    return {"username": "fakecurrentuser"}
-
-
-@router.get("/{username}")
-async def read_augment_parameters(username: str):
-    return {"username": username}
+async def augmentations() -> Coroutine[List[str], None, None]:
+    return [augment.value for augment in AugmentType]
