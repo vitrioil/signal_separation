@@ -106,7 +106,7 @@ async def create_stem(
     row = (
         await conn.get_default_database()
         .get_collection(stem_collection_name)
-        .insert_one(signal.dict())
+        .insert_one(signal_in_db.dict())
     )
 
     signal_in_db.id = str(row.inserted_id)

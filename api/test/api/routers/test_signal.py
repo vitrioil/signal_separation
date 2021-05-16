@@ -66,8 +66,7 @@ def test_post_signal(signal_file_name, client, celery_app, cleanup_db):
 def test_patch_signal(signal, signal_file_name, client, cleanup_db):
     stem_name = "new_stem"
     response = client.patch(
-        "/signal/Music",
-        params={"signal_id": TEST_SIGNAL_ID, "stem_name": stem_name},
+        f"/signal/invalid/{stem_name}",
         files={
             "signal_file": (
                 "filename",
@@ -77,13 +76,46 @@ def test_patch_signal(signal, signal_file_name, client, cleanup_db):
         },
     )
     data = response.json()
-    print(data)
+    assert response.status_code == 404
+
+    response = client.patch(
+        f"/signal/{TEST_SIGNAL_ID}/{stem_name}",
+        files={
+            "signal_file": (
+                "filename",
+                open(signal_file_name, "rb"),
+                "audio/mpeg",
+            )
+        },
+    )
+    data = response.json()
     assert response.status_code == 202
     assert data["signal"]["signal_id"] == TEST_SIGNAL_ID
     assert data["signal"]["separated_stems"][-1] == stem_name
 
 
+def test_delete_stem(generate_stem, client, cleanup_db):
+    response = client.delete(f"/signal/{TEST_SIGNAL_ID}/invalid")
+    assert response.status_code == 404
+
+    response = client.delete(f"/signal/invalid/{TEST_STEMS[0]}")
+    assert response.status_code == 404
+
+    response = client.delete(f"/signal/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
+    data = response.json()
+    assert response.status_code == 202
+    assert data["stem_name"] == TEST_STEMS[0]
+    assert data["deleted"]
+
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
+    assert response.status_code == 404
+
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[1]}")
+    assert response.status_code == 200
+
+
 def test_delete_signal(signal, client, cleanup_db):
+    # TODO
     response = client.delete("/signal/0")
     assert response.status_code == 404
 

@@ -21,6 +21,7 @@ from api.separator import SignalType
 from api.schemas import (
     SignalInDB,
     SignalMetadata,
+    SeparatedSignal,
     UserInCreate,
     UserInDB,
 )
@@ -134,15 +135,27 @@ def signal_file(signal_file_name):
 
 @pytest.fixture
 async def generate_stem(signal, signal_file, db_client):
-    from api.services import save_stem_file, update_signal, get_stem_id
+    from api.services import (
+        save_stem_file,
+        update_signal,
+        get_stem_id,
+        create_stem,
+    )
 
     sr = 44_100
     test_stem = np.zeros((sr * 10, 2))
     separated_id = []
     for stem_name in TEST_STEMS:
-        stem_id = get_stem_id(stem_name, signal.signal_id)
+        stem_id = get_stem_id(stem_name, TEST_SIGNAL_ID)
         file_id = await save_stem_file(db_client, stem_id, test_stem, sr)
         separated_id.append(file_id)
+        stem = SeparatedSignal(
+            signal_id=file_id,
+            signal_metadata=signal.signal_metadata,
+            stem_name=stem_name,
+        )
+
+        await create_stem(db_client, stem, TEST_USERNAME)
 
     await update_signal(
         db_client,

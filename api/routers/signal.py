@@ -177,14 +177,13 @@ async def post_signal(
 
 
 @router.patch(
-    "/{signal_type}",
+    "/{signal_id}/{stem_name}",
     response_model=SignalInResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def patch_signal(
     signal_id: str = Path(..., title="Signal ID"),
     stem_name: str = Path(..., title="Stem name"),
-    signal_type: SignalType = Path(..., title="Type of Signal"),
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
     user: User = Depends(get_current_user),
@@ -193,14 +192,17 @@ async def patch_signal(
     """
 
     # validate
-    exception = HTTPException(status_code=404, detail="Signal not found")
-    if not await validate_user_signal(db, signal_id, user.username):
+    exception = HTTPException(
+        status_code=404, detail=f"Signal {signal_id} not found"
+    )
+    parent_signal = await read_one_signal(db, signal_id, user.username)
+    if not parent_signal:
         raise exception
 
     try:
         # saving stem file requires array for consistency
         signal_metadata, signal = process_signal(
-            signal_file, signal_type, array=True
+            signal_file, parent_signal.signal_metadata.signal_type, array=True
         )
     except Exception:
         raise HTTPException(
@@ -230,29 +232,42 @@ async def patch_signal(
     return SignalInResponse(signal=Signal(**parent_signal.dict()))
 
 
-# @router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)
-# async def delete_stem(
-#     stem_name: str = Path(..., title="Stem name"),
-#     signal_id: str = Path(..., title="Signal ID"),
-#     db: AsyncIOMotorClient = Depends(get_database),
-#     user: User = Depends(get_current_user),
-# ) -> Coroutine[dict, None, None]:
-#     """Delete stem of a signal.
-#     """
-#     signal = await read_one_signal(db, signal_id, user.username)
-#     if not signal:
-#         raise HTTPException(status_code=404, detail="Signal not found")
+@router.delete(
+    "/{signal_id}/{stem_name}", status_code=status.HTTP_202_ACCEPTED
+)
+async def delete_stem(
+    stem_name: str = Path(..., title="Stem name"),
+    signal_id: str = Path(..., title="Signal ID"),
+    db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
+) -> Coroutine[dict, None, None]:
+    """Delete stem of a signal.
+    """
+    signal = await read_one_signal(db, signal_id, user.username)
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
 
-#     try:
-#         stem_index = signal.separated_stems.index(stem_name)
-#     except ValueError:
-#         raise HTTPException(status_code=404, detail="Stem not found")
-#     stem_id = signal.separated_stem_id[stem_index]
-#     try:
-#         await delete_signal_file(db, stem_id)
-#     except Exception:
-#         raise HTTPException(status_code=500, detail="Internal error")
-#     deleted = await remove_signal(db, stem_id, user.username, stem=True)
+    try:
+        stem_index = signal.separated_stems.index(stem_name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Stem not found")
+    stem_id = signal.separated_stem_id[stem_index]
+    try:
+        await delete_signal_file(db, stem_id)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal error")
+    deleted = await remove_signal(db, stem_id, user.username, stem=True)
+    if deleted:
+        signal.separated_stem_id.pop(stem_index)
+        signal.separated_stems.pop(stem_index)
+        await update_signal(
+            db,
+            signal.signal_id,
+            user.username,
+            separated_stems=signal.separated_stems,
+            separated_stem_id=signal.separated_stem_id,
+        )
+    return {"stem_name": stem_name, "deleted": deleted}
 
 
 @router.delete("/{signal_id}", status_code=status.HTTP_202_ACCEPTED)
