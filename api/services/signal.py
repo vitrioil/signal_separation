@@ -187,6 +187,17 @@ async def chunk_gen(
         yield chunk
 
 
+async def rename_file(
+    conn: AsyncIOMotorClient, file_id: str, new_filename: str
+) -> Coroutine[None, None, None]:
+    db = conn.get_default_database()
+    fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
+    try:
+        await fs.rename(ObjectId(file_id), new_filename)
+    except NoFile:
+        raise Exception("No File found")
+
+
 async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)

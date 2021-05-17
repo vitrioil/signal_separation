@@ -94,6 +94,34 @@ def test_patch_signal(signal, signal_file_name, client, cleanup_db):
     assert data["signal"]["separated_stems"][-1] == stem_name
 
 
+def test_rename_stem(generate_stem, client, cleanup_db):
+    new_stem_name = "new_name"
+    response = client.patch(
+        f"/signal/rename/invalid/{TEST_STEMS[0]}?new_stem_name={new_stem_name}"
+    )
+    assert response.status_code == 404
+
+    response = client.patch(
+        f"/signal/rename/{TEST_SIGNAL_ID}/invalid?new_stem_name={new_stem_name}"
+    )
+    assert response.status_code == 404
+
+    response = client.patch(
+        f"/signal/rename/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}?new_stem_name={new_stem_name}"
+    )
+    data = response.json()
+    assert response.status_code == 202
+    assert data["signal"]["separated_stems"][0] == new_stem_name
+
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
+    assert response.status_code == 404
+
+    response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{new_stem_name}")
+    data = response.content
+    assert response.status_code == 200
+    assert data
+
+
 def test_delete_stem(generate_stem, client, cleanup_db):
     response = client.delete(f"/signal/{TEST_SIGNAL_ID}/invalid")
     assert response.status_code == 404
@@ -133,4 +161,5 @@ def test_get_stem(generate_stem, client):
     response = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
     data = response.content
     assert response.status_code == 200
+    # even for 404 assert data will be true
     assert data

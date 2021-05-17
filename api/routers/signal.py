@@ -40,6 +40,7 @@ from api.services import (
     create_stem,
     update_signal,
     save_stem_file,
+    rename_file,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -230,6 +231,46 @@ async def patch_signal(
         separated_stem_id=[*signal.separated_stem_id, stem_id],
     )
     return SignalInResponse(signal=Signal(**parent_signal.dict()))
+
+
+@router.patch(
+    "/rename/{signal_id}/{stem_name}",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=SignalInResponse,
+)
+async def change_stem_name(
+    new_stem_name: str,
+    signal_id: str = Path(..., title="Signal ID"),
+    stem_name: str = Path(..., title="Stem name"),
+    db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
+) -> Coroutine[dict, None, None]:
+    """Rename stem of a signal.
+    """
+    signal = await read_one_signal(db, signal_id, user.username)
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    try:
+        stem_index = signal.separated_stems.index(stem_name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Stem not found")
+    signal.separated_stems[stem_index] = new_stem_name
+
+    stem_id = signal.separated_stem_id[stem_index]
+    new_stem_id = get_stem_id(new_stem_name, signal.signal_id)
+    try:
+        await rename_file(db, stem_id, new_stem_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    updated_signal = await update_signal(
+        db,
+        signal.signal_id,
+        user.username,
+        separated_stems=signal.separated_stems,
+    )
+    return SignalInResponse(signal=Signal(**updated_signal.dict()))
 
 
 @router.delete(
