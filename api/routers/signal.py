@@ -1,4 +1,3 @@
-from inspect import CO_ASYNC_GENERATOR
 from typing import List, Coroutine
 from fastapi.responses import StreamingResponse
 from fastapi import (
@@ -175,6 +174,19 @@ async def post_signal(
     signal_in_db = await create_signal(db, signal, user.username)
     separate.delay(signal_in_db.dict(), user.dict())
     return SignalInResponse(signal=signal_in_db)
+
+
+@router.post(
+    "/copy/{signal_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=SignalInResponse,
+)
+async def copy_signal(
+    signal_id: str = Path(..., title="Signal ID"),
+    db: AsyncIOMotorClient = Depends(get_database),
+    user: User = Depends(get_current_user),
+) -> Coroutine[SignalInResponse, None, None]:
+    pass
 
 
 @router.patch(
