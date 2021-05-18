@@ -198,6 +198,17 @@ async def rename_file(
         raise Exception("No File found")
 
 
+async def copy_file(
+    conn: AsyncIOMotorClient, filename: str, new_filename: str
+):
+    stream = await read_signal_file(conn, filename, stream=False)
+    with NamedTemporaryFile() as temp_file:
+        temp_file.write(stream)
+        upload_file = UploadFile(filename=new_filename, file=temp_file)
+        file_id = await save_signal_file(conn, upload_file)
+    return file_id
+
+
 async def delete_signal_file(conn: AsyncIOMotorClient, file_id: str):
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)

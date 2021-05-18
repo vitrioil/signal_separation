@@ -1,3 +1,4 @@
+from api.schemas.signal import SignalInDB
 from typing import List, Coroutine
 from fastapi.responses import StreamingResponse
 from fastapi import (
@@ -40,6 +41,7 @@ from api.services import (
     update_signal,
     save_stem_file,
     rename_file,
+    copy_file,
 )
 from api.separator import SignalType
 from api.db import get_database
@@ -176,17 +178,36 @@ async def post_signal(
     return SignalInResponse(signal=signal_in_db)
 
 
-@router.post(
-    "/copy/{signal_id}",
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=SignalInResponse,
-)
-async def copy_signal(
-    signal_id: str = Path(..., title="Signal ID"),
-    db: AsyncIOMotorClient = Depends(get_database),
-    user: User = Depends(get_current_user),
-) -> Coroutine[SignalInResponse, None, None]:
-    pass
+# @router.post(
+#     "/copy/{signal_id}",
+#     status_code=status.HTTP_202_ACCEPTED,
+#     response_model=SignalInResponse,
+# )
+# async def copy_signal(
+#     signal_id: str = Path(..., title="Signal ID"),
+#     db: AsyncIOMotorClient = Depends(get_database),
+#     user: User = Depends(get_current_user),
+# ) -> Coroutine[SignalInResponse, None, None]:
+#     exception = HTTPException(
+#         status_code=404, detail=f"Signal {signal_id} not found"
+#     )
+#     signal = await read_one_signal(db, signal_id, user.username)
+#     if not signal:
+#         raise exception
+#     signal_copy = await create_signal(db, Signal(**signal), user.username)
+#     separated_stem_id = []
+#     for stem_name in signal.separated_stem:
+#         stem_id = get_stem_id(stem_name, signal.signal_id)
+#         file_id = await copy_file(db, stem_id)
+#         separated_stem_id.append(file_id)
+
+#     signal_copy = await update_signal(
+#         db,
+#         signal_copy.signal_id,
+#         username=user.username,
+#         separated_stem_id=separated_stem_id,
+#     )
+#     return SignalInResponse(signal=Signal(**signal_copy))
 
 
 @router.patch(

@@ -15,5 +15,6 @@ from .signal import (
     watch_collection_field,
     validate_user_signal,
     rename_file,
+    copy_file,
 )
 from .user import create_user, get_user
