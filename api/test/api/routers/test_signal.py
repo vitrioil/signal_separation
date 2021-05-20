@@ -132,7 +132,9 @@ def test_copy_stem(generate_stem, client, cleanup_db):
     assert data["signal"]["signal_id"] != TEST_SIGNAL_ID
     assert data["signal"]["separated_stems"] == TEST_STEMS
 
-    response = client.get(f"/signal/stem/{data['signal']['signal_id']}/{TEST_STEMS[0]}")
+    response = client.get(
+        f"/signal/stem/{data['signal']['signal_id']}/{TEST_STEMS[0]}"
+    )
     assert response.status_code == 200
 
     response_old = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
