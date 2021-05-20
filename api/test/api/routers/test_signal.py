@@ -122,6 +122,23 @@ def test_rename_stem(generate_stem, client, cleanup_db):
     assert data
 
 
+def test_copy_stem(generate_stem, client, cleanup_db):
+    response = client.post(f"/signal/copy/invalid")
+    assert response.status_code == 404
+
+    response = client.post(f"/signal/copy/{TEST_SIGNAL_ID}")
+    data = response.json()
+    assert response.status_code == 202
+    assert data["signal"]["signal_id"] != TEST_SIGNAL_ID
+    assert data["signal"]["separated_stems"] == TEST_STEMS
+
+    response = client.get(f"/signal/stem/{data['signal']['signal_id']}/{TEST_STEMS[0]}")
+    assert response.status_code == 200
+
+    response_old = client.get(f"/signal/stem/{TEST_SIGNAL_ID}/{TEST_STEMS[0]}")
+    assert response.content == response_old.content
+
+
 def test_delete_stem(generate_stem, client, cleanup_db):
     response = client.delete(f"/signal/{TEST_SIGNAL_ID}/invalid")
     assert response.status_code == 404
