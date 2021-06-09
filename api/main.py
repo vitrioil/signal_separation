@@ -1,5 +1,7 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
 
 from api.routers import augment, signal, auth
 from api.db import connect_to_mongo, close_mongo_connection
@@ -18,19 +20,28 @@ tags_metadata = [
     }
 ]
 
-api = FastAPI(openapi_tags=tags_metadata, title="Signal Separation API")
 origins = [
     "http://localhost:3000",
 ]
+api = FastAPI(
+        openapi_tags=tags_metadata,
+        title="Signal Separation API",
+        middleware=[Middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )]
+      )
 
-api.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# api.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 api.add_event_handler("startup", connect_to_mongo)
 api.add_event_handler("shutdown", close_mongo_connection)

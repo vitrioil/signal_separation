@@ -1,3 +1,4 @@
+from os import stat
 from bson import ObjectId
 from typing import List, Coroutine
 from fastapi.responses import StreamingResponse
@@ -158,6 +159,7 @@ async def post_signal(
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
     user: User = Depends(get_current_user),
+    stems: int = 2
 ) -> Coroutine[SignalInResponse, None, None]:
     """Post a signal to separate. Signal Type is used to
     determine the separation process. Posting triggers a
@@ -165,6 +167,11 @@ async def post_signal(
     or `/signal/status`.
     """
     # early validations for file extension / metadata based validation
+    if not (stems == 2 or stems == 4 or stems == 5):
+        raise HTTPException(
+            status_code=400, detail="Only stems 2, 4, 5 are supported"
+        )
+
     try:
         signal_metadata = process_signal(signal_file, signal_type)
     except Exception:
@@ -174,7 +181,7 @@ async def post_signal(
     file_id = await save_signal_file(db, signal_file)
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal, user.username)
-    separate.delay(signal_in_db.dict(), user.dict())
+    separate.delay(signal_in_db.dict(), user.dict(), stems)
     return SignalInResponse(signal=signal_in_db)
 
 
