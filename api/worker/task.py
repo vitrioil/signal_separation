@@ -55,8 +55,6 @@ async def perform_separation(
 
     user = User(**user)
 
-    await _update_state(self, db, signal_id, user.username, TaskState.Start)
-
     signal_type = signal.signal_metadata.signal_type
     separator = get_separator(signal_type, stems)
 

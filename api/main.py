@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+
 # from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
@@ -21,19 +22,22 @@ tags_metadata = [
 ]
 
 origins = [
-    "http://localhost:3000",
+    # "http://localhost:3000",
+    "*"
 ]
 api = FastAPI(
-        openapi_tags=tags_metadata,
-        title="Signal Separation API",
-        middleware=[Middleware(
+    openapi_tags=tags_metadata,
+    title="Signal Separation API",
+    middleware=[
+        Middleware(
             CORSMiddleware,
             allow_origins=origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
-        )]
-      )
+        )
+    ],
+)
 
 # api.add_middleware(
 #     CORSMiddleware,

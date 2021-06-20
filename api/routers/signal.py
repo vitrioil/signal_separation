@@ -159,7 +159,7 @@ async def post_signal(
     db: AsyncIOMotorClient = Depends(get_database),
     signal_file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-    stems: int = 2
+    stems: int = 2,
 ) -> Coroutine[SignalInResponse, None, None]:
     """Post a signal to separate. Signal Type is used to
     determine the separation process. Posting triggers a
@@ -182,6 +182,13 @@ async def post_signal(
     signal = SignalInCreate(signal_metadata=signal_metadata, signal_id=file_id)
     signal_in_db = await create_signal(db, signal, user.username)
     separate.delay(signal_in_db.dict(), user.dict(), stems)
+    await update_signal_state(
+        db,
+        SignalState(
+            signal_id=signal_in_db.signal_id, signal_state=TaskState.Start
+        ),
+        user.username,
+    )
     return SignalInResponse(signal=signal_in_db)
 
 
