@@ -42,6 +42,7 @@ def split_audio(
 def process_signal(
     signal_file: UploadFile,
     signal_type: SignalType,
+    project_name="",
     segment=False,
     array=False,
 ) -> SignalMetadata:
@@ -55,6 +56,7 @@ def process_signal(
         sample_width=audio_segment.sample_width,
         signal_type=signal_type,
         filename=filename,
+        projectname=project_name,
     )
     if segment:
         return signal_metadata, audio_segment

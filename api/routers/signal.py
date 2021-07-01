@@ -160,6 +160,7 @@ async def post_signal(
     signal_file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     stems: int = 2,
+    project_name: str = "",
 ) -> Coroutine[SignalInResponse, None, None]:
     """Post a signal to separate. Signal Type is used to
     determine the separation process. Posting triggers a
@@ -172,8 +173,11 @@ async def post_signal(
             status_code=400, detail="Only stems 2, 4, 5 are supported"
         )
 
+    print("PROJECT NAME", project_name)
     try:
-        signal_metadata = process_signal(signal_file, signal_type)
+        signal_metadata = process_signal(
+            signal_file, signal_type, project_name=project_name
+        )
     except Exception:
         raise HTTPException(
             status_code=400, detail="Error while processing file"

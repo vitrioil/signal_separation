@@ -24,6 +24,9 @@ class SignalMetadata(BaseModel):
         ..., example=SignalType.Music, description="Type of Signal"
     )
     filename: str = Field(..., example="Song", description="Name of file")
+    projectname: str = Field(
+        None, example="Project Name", description="Name of this project"
+    )
 
 
 class SignalBase(BaseModel):
