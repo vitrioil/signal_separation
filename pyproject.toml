@@ -22,6 +22,7 @@ uvicorn = {version = "^0.13.4", extras = ["standard"]}
 spleeter = "1.5.2"
 passlib = {version = "^1.7.4", extras = ["bcrypt"]}
 python-jose = {version = "^3.2.0", extras = ["cryptography"]}
+torchaudio = "^0.9.0"
 
 [tool.poetry.dev-dependencies]
 pylama = "^7.7.1"
