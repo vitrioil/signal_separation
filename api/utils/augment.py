@@ -1,7 +1,8 @@
 import torch
 import torchaudio
+import numpy as np
 
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, TypeVar
 from dataclasses import dataclass
 
 
@@ -10,6 +11,13 @@ class AudioEffectParameters:
     effect_name: str
     duration: Tuple[float, float]
     effect_params: List[Any]
+
+
+def to_tensor(audio: np.ndarray):
+    return torch.from_numpy(audio)
+
+
+T = TypeVar('T', bound='AudioEffectHelper')
 
 
 class AudioEffectHelper:
@@ -24,7 +32,7 @@ class AudioEffectHelper:
     def __init__(self):
         self.effects = []
 
-    def vol(self, gain: str, duration: Tuple[float, float] = None):
+    def vol(self, gain: str, duration: Tuple[float, float] = None) -> T:
         """SoX: Apply an amplification or an attenuation to the audio signal.
 
             Args:
@@ -39,6 +47,8 @@ class AudioEffectHelper:
         self,
         audio: torch.Tensor,
         sample_rate: int,
+        effect_name: str,
+        effect_params: List[str],
         duration: Tuple[float, float],
     ):
         if not duration:
@@ -47,25 +57,30 @@ class AudioEffectHelper:
         else:
             duration = map(lambda x: int(x * sample_rate), duration)
             start, end = tuple(duration)
+        effects = [[effect_name, *effect_params]]
         audio[:, start:end] = torchaudio.sox_effects.apply_effects_tensor(
-            audio[:, start:end], sample_rate
+            audio[:, start:end], sample_rate, effects
         )[0]
         return audio
 
     def apply(
         self, audio: torch.Tensor, sample_rate: int, channels_first=False
-    ):
+    ) -> torch.Tensor:
         if not channels_first:
             audio = audio.swapaxes(0, 1)
 
         for audio_effect in self.effects:
             audio = self._apply_interval(
-                audio, sample_rate, audio_effect.duration
+                audio,
+                sample_rate,
+                audio_effect.effect_name,
+                audio_effect.effect_params,
+                audio_effect.duration
             )
 
         if not channels_first:
             audio = audio.swapaxes(0, 1)
         return audio
 
-    def clear(self):
+    def clear(self) -> None:
         self.effects = []
