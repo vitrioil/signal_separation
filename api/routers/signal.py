@@ -1,4 +1,3 @@
-from os import stat
 from bson import ObjectId
 from typing import List, Coroutine
 from fastapi.responses import StreamingResponse

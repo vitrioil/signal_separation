@@ -2,22 +2,24 @@ import torch
 import torchaudio
 import numpy as np
 
-from typing import List, Any, Tuple, TypeVar
+from typing import List, Any, Dict, Tuple, TypeVar
 from dataclasses import dataclass
+
+from api.schemas import Volume, Copy, BaseAugment, Augmentation
 
 
 @dataclass
 class AudioEffectParameters:
     effect_name: str
     duration: Tuple[float, float]
-    effect_params: List[Any]
+    effect_params: Dict[str, Any]
 
 
 def to_tensor(audio: np.ndarray):
     return torch.from_numpy(audio)
 
 
-T = TypeVar('T', bound='AudioEffectHelper')
+T = TypeVar("T", bound="AudioEffectHelper")
 
 
 class AudioEffectHelper:
@@ -25,7 +27,7 @@ class AudioEffectHelper:
 
         Example use:
         >>>affect = AudioEffectHelper()
-        >>>affect.vol('0.1').vol('0.2')
+        >>>affect.vol('0.1', (0, 10)).vol('0.2', 30, 40)
         >>>effect = affect.apply(audio_tensor, sample_rate)
     """
 
@@ -40,7 +42,9 @@ class AudioEffectHelper:
                 duration (tuple[float, float]): affected time interval.
                     Keep None to apply for entire signal
         """
-        self.effects.append(AudioEffectParameters("vol", duration, [gain]))
+        self.effects.append(
+            AudioEffectParameters("vol", duration, {"gain": gain})
+        )
         return self
 
     def _apply_interval(
@@ -74,8 +78,8 @@ class AudioEffectHelper:
                 audio,
                 sample_rate,
                 audio_effect.effect_name,
-                audio_effect.effect_params,
-                audio_effect.duration
+                audio_effect.effect_params.values(),
+                audio_effect.duration,
             )
 
         if not channels_first:
@@ -84,3 +88,17 @@ class AudioEffectHelper:
 
     def clear(self) -> None:
         self.effects = []
+
+
+def augment_signal(signal: torch.Tensor, augmentations: List[BaseAugment]):
+    affect = AudioEffectHelper()
+    for augmentation in augmentations:
+        if augmentation.augment_type == Augmentation.Volume:
+            affect.vol(
+                str(augmentation.gain),
+                (augmentation.start_time, augmentation.end_time),
+            )
+        elif augmentation.augment_type == Augmentation.Copy:
+            pass
+    signal = affect.apply(signal)
+    return signal
