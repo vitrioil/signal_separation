@@ -7,4 +7,10 @@ from api.schemas import BaseAugment, Copy, Volume
 async def create_augmentation(
     conn: AsyncIOMotorClient, augmentation: BaseAugment
 ):
-    pass
+    row = (
+        await conn.get_default_database()
+        .get_collection(augment_collection_name)
+        .insert_one(augmentation.dict())
+    )
+    if row:
+        return True

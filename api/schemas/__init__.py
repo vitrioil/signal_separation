@@ -17,4 +17,4 @@ from .user import (
     UserInResponse,
     UserInDB,
 )
-from .augment import BaseAugment, Volume, Copy, Augmentation
+from .augment import BaseAugment, Volume, Copy, Augmentation, Reverb

@@ -1,7 +1,8 @@
 from typing import Dict, Tuple
 from pathlib import Path
-from tempfile import TemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryFile
 
+import librosa
 import numpy as np
 from pydub import AudioSegment
 from fastapi import UploadFile
@@ -18,7 +19,7 @@ def pydub_to_np(audio: AudioSegment) -> Tuple[np.ndarray, int]:
     return signal
 
 
-def read_audio(stream: bytes, extension: str) -> np.ndarray:
+def read_audio(stream: bytes, extension: str = "") -> np.ndarray:
     with TemporaryFile() as temp_file:
         temp_file.write(stream)
         temp_file.seek(0)
@@ -26,6 +27,16 @@ def read_audio(stream: bytes, extension: str) -> np.ndarray:
 
     signal = pydub_to_np(signal)
     return signal
+
+
+def np_to_stream(signal: np.ndarray, sample_rate=44_100) -> bytes:
+    with NamedTemporaryFile() as temp_file:
+        filename = temp_file.name
+        librosa.output.write_wav(
+            filename, np.asfortranarray(signal), sr=sample_rate
+        )
+        for signal_bytes in temp_file.readlines():
+            yield signal_bytes
 
 
 def split_audio(

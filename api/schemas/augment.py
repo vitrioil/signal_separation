@@ -6,6 +6,7 @@ class Augmentation(str, Enum):
     Base: str = "Base"
     Volume: str = "Volume"
     Copy: str = "Copy"
+    Reverb: str = "Reverb"
 
 
 class BaseAugment(BaseModel):
@@ -42,4 +43,13 @@ class Copy(BaseAugment):
     )
     copy_end_time: int = Field(
         ..., example=60, description="New end time of augment"
+    )
+
+
+class Reverb(BaseAugment):
+    augment_type: Augmentation = Field(
+        Augmentation.Reverb, description="Augmentation Type"
+    )
+    reverberance: int = Field(
+        ..., example=50, description="Percentage of reverberation"
     )

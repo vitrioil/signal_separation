@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Any, Dict, Tuple, TypeVar
 from dataclasses import dataclass
 
-from api.schemas import Volume, Copy, BaseAugment, Augmentation
+from api.schemas import BaseAugment, Augmentation
 
 
 @dataclass
@@ -16,7 +16,7 @@ class AudioEffectParameters:
 
 
 def to_tensor(audio: np.ndarray):
-    return torch.from_numpy(audio)
+    return torch.from_numpy(audio.astype(np.float32))
 
 
 T = TypeVar("T", bound="AudioEffectHelper")
@@ -47,6 +47,22 @@ class AudioEffectHelper:
         )
         return self
 
+    def reverb(
+        self, reverberance: int, duration: Tuple[float, float] = None
+    ) -> T:
+        """SoX: Add reverberation to the audio using the `freeverb' algorithm.
+
+            Args:
+                reverberance (int): percentage of reverberance
+                duration (tuple[float, float]): affected time interval.
+                    Keep None to apply for entire signal
+        """
+        self.effects.append(
+            AudioEffectParameters(
+                "reverb", duration, {"reverberance": reverberance}
+            )
+        )
+
     def _apply_interval(
         self,
         audio: torch.Tensor,
@@ -68,7 +84,10 @@ class AudioEffectHelper:
         return audio
 
     def apply(
-        self, audio: torch.Tensor, sample_rate: int, channels_first=False
+        self,
+        audio: torch.Tensor,
+        sample_rate: int = 44_100,
+        channels_first=False,
     ) -> torch.Tensor:
         if not channels_first:
             audio = audio.swapaxes(0, 1)
@@ -90,7 +109,8 @@ class AudioEffectHelper:
         self.effects = []
 
 
-def augment_signal(signal: torch.Tensor, augmentations: List[BaseAugment]):
+def augment_signal(signal: np.ndarray, augmentations: List[BaseAugment]):
+    signal = to_tensor(signal)
     affect = AudioEffectHelper()
     for augmentation in augmentations:
         if augmentation.augment_type == Augmentation.Volume:
@@ -100,5 +120,11 @@ def augment_signal(signal: torch.Tensor, augmentations: List[BaseAugment]):
             )
         elif augmentation.augment_type == Augmentation.Copy:
             pass
+        elif augmentation.augment_type == Augmentation.Reverb:
+            affect.reverb(
+                str(augmentation.reverberance),
+                (augmentation.start_time, augmentation.end_time),
+            )
     signal = affect.apply(signal)
+    signal = signal.numpy()
     return signal
