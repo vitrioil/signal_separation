@@ -134,6 +134,7 @@ async def get_stem(
     signal_id: str = Path(..., title="Signal ID"),
     stem: str = Path(..., title="Stem name of separated signal"),
     db: AsyncIOMotorClient = Depends(get_database),
+    augmented_stem: bool = False,
     user: User = Depends(get_current_user),
 ) -> Coroutine[StreamingResponse, None, None]:
     """Get an individual separated signal stem.
@@ -142,7 +143,9 @@ async def get_stem(
     if not await validate_user_signal(db, signal_id, user.username):
         raise exception
     stem_file_id = get_stem_id(stem, signal_id)
-    stream = await read_signal_file(db, stem_file_id)
+    stream = await read_signal_file(
+        db, stem_file_id, augmented_signal=augmented_stem
+    )
     if not stream:
         raise exception
     return StreamingResponse(stream, media_type="audio/mpeg")

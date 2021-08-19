@@ -1,3 +1,4 @@
+from api.utils.augment import augment_signal
 from typing import Union, Generator, Coroutine, List
 import numpy as np
 import librosa
@@ -8,6 +9,7 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from fastapi import UploadFile
 from gridfs.errors import NoFile
+from numpy.compat.py3k import asstr
 
 from api.schemas import (
     Signal,
@@ -149,9 +151,13 @@ async def save_stem_file(
     stem_name: str,
     signal: np.ndarray,
     sample_rate: int,
+    augmented_signal: bool = False,
 ) -> Coroutine[str, None, None]:
+    if augmented_signal:
+        stem_name = f"{stem_name}_augment"
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
+    print(f"Saving {stem_name}")
     with NamedTemporaryFile() as temp_file:
         filename = temp_file.name
         librosa.output.write_wav(
@@ -163,8 +169,14 @@ async def save_stem_file(
 
 
 async def read_signal_file(
-    conn: AsyncIOMotorClient, filename: str, stream=True
+    conn: AsyncIOMotorClient,
+    filename: str,
+    stream=True,
+    augmented_signal: bool = False,
 ) -> Coroutine[Union[bytes, Generator[bytes, None, None]], None, None]:
+    if augmented_signal:
+        filename = f"{filename}_augment"
+    print(f"Readinf {filename}")
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     try:

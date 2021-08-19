@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from api.config import augment_collection_name
-from api.schemas import BaseAugment, Copy, Volume
+from api.schemas import BaseAugment
 
 
 async def create_augmentation(
