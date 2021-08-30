@@ -3,6 +3,7 @@ from api.services.signal import (
     read_one_signal,
     read_signal_file,
     save_stem_file,
+    update_stem,
 )
 from typing import Coroutine, List, Union
 from fastapi import APIRouter, status, Depends, HTTPException
@@ -48,19 +49,23 @@ async def augment(
         stem_augments = signals.get(augment.signal_stem, [])
         stem_augments.append(augment)
         signals[augment.signal_stem] = stem_augments
-
     for stem, augmentations in signals.items():
         stem_id = get_stem_id(stem, signal_id)
         stem_signal = await read_signal_file(
             db, get_stem_id(stem, signal_id), stream=False
         )
         stem_signal = read_audio(stem_signal)
-        result = augment_signal(stem_signal, augmentations)
+        result = augment_signal(
+            stem_signal, augmentations, signal.signal_metadata.sample_rate
+        )
         await save_stem_file(
             db,
             stem_id,
             result,
             signal.signal_metadata.sample_rate,
             augmented_signal=True,
+        )
+        await update_stem(
+            db, signal.signal_id, stem, user.username, augmented=True
         )
     return True

@@ -1,4 +1,3 @@
-from api.utils.augment import augment_signal
 from typing import Union, Generator, Coroutine, List
 import numpy as np
 import librosa
@@ -9,7 +8,6 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from fastapi import UploadFile
 from gridfs.errors import NoFile
-from numpy.compat.py3k import asstr
 
 from api.schemas import (
     Signal,
@@ -31,15 +29,23 @@ def get_stem_id(stem_name: str, signal_id: str) -> str:
 
 
 async def read_one_signal(
-    conn: AsyncIOMotorClient, signal_id: str, username: str
-) -> Coroutine[SignalInDB, None, None]:
+    conn: AsyncIOMotorClient, signal_id: str, username: str, stem: str = ""
+) -> Coroutine[Union[SignalInDB, SeparatedSignalInDB], None, None]:
+    collection_name = signal_collection_name
+    filter_args = {"signal_id": signal_id, "username": username}
+    if stem:
+        collection_name = stem_collection_name
+        filter_args = {**filter_args, "stem_name": stem}
     row = (
         await conn.get_default_database()
-        .get_collection(signal_collection_name)
-        .find_one({"signal_id": signal_id, "username": username})
+        .get_collection(collection_name)
+        .find_one()
     )
     if row:
-        row = SignalInDB(**row)
+        if stem:
+            row = SeparatedSignalInDB(**row)
+        else:
+            row = SignalInDB(**row)
     return row
 
 
@@ -118,6 +124,25 @@ async def create_stem(
     return signal_in_db
 
 
+async def update_stem(
+    conn: AsyncIOMotorClient,
+    signal_id: str,
+    stem_name: str,
+    username: str,
+    **update_kwargs,
+) -> Coroutine[SignalInDB, None, None]:
+    signal = await read_one_signal(conn, signal_id, username, stem=stem_name)
+    signal = SeparatedSignalInDB(**{**signal.dict(), **update_kwargs})
+    signal.updated_at = datetime.now()
+    print(signal)
+    await conn.get_default_database().get_collection(
+        stem_collection_name
+    ).replace_one(
+        {"signal_id": signal.signal_id, "stem_name": stem_name}, signal.dict()
+    )
+    return signal
+
+
 async def validate_user_signal(
     conn: AsyncIOMotorClient, signal_id: str, username: str
 ) -> bool:
@@ -157,7 +182,6 @@ async def save_stem_file(
         stem_name = f"{stem_name}_augment"
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
-    print(f"Saving {stem_name}")
     with NamedTemporaryFile() as temp_file:
         filename = temp_file.name
         librosa.output.write_wav(
@@ -176,7 +200,6 @@ async def read_signal_file(
 ) -> Coroutine[Union[bytes, Generator[bytes, None, None]], None, None]:
     if augmented_signal:
         filename = f"{filename}_augment"
-    print(f"Readinf {filename}")
     db = conn.get_default_database()
     fs = AsyncIOMotorGridFSBucket(db, bucket_name=grid_bucket_name)
     try:

@@ -109,7 +109,9 @@ class AudioEffectHelper:
         self.effects = []
 
 
-def augment_signal(signal: np.ndarray, augmentations: List[BaseAugment]):
+def augment_signal(
+    signal: np.ndarray, augmentations: List[BaseAugment], sample_rate: int
+):
     signal = to_tensor(signal)
     affect = AudioEffectHelper()
     for augmentation in augmentations:
@@ -125,6 +127,6 @@ def augment_signal(signal: np.ndarray, augmentations: List[BaseAugment]):
                 str(augmentation.reverberance),
                 (augmentation.start_time, augmentation.end_time),
             )
-    signal = affect.apply(signal)
+    signal = affect.apply(signal, sample_rate)
     signal = signal.numpy()
     return signal

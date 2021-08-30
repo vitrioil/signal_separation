@@ -58,6 +58,9 @@ class SeparatedSignal(SignalBase):
     stem_name: str = Field(
         ..., example="Vocals", description="Name of separated stem"
     )
+    augmented: bool = Field(
+        False, example=False, description="Augmented status of stem"
+    )
 
 
 class SeparatedSignalInDB(DBModelMixin, SeparatedSignal):

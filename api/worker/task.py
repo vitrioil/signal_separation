@@ -90,6 +90,7 @@ async def perform_separation(
             signal_id=stem_id,
             signal_metadata=signal.signal_metadata,
             stem_name=stem_name,
+            augmented=False,
         )
 
         await create_stem(db, stem, user.username)

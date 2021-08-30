@@ -16,5 +16,6 @@ from .signal import (
     validate_user_signal,
     rename_file,
     copy_file,
+    update_stem,
 )
 from .user import create_user, get_user
