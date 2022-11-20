@@ -39,3 +39,7 @@ For custom separator inherit [ABCSeparator](./api/separator/base.py) and use it 
 # Augmentations
 Default includes volume and reverb augmentation.
 More augmentations can be added in [AudioEffectHelper](./api/utils/augment.py)
+
+
+# Tests
+[Automated tests](./api/test/)
